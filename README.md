@@ -2,6 +2,8 @@ Order Processing System
 ------
 
 ### How to start Order Processing Service?
+> install and start redis database 
+
 > cd order_process/
 
 > go build
