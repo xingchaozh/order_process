@@ -1,21 +1,22 @@
 # order_process
 Order processing system
 
-1. How to qurey the status of Order Processing Service?
+
+How to qurey the status of Order Processing Service?
 
 curl -H "Authorization:user" http://localhost:8080/diagnostic/heartbeat
 
 {"serive_id":"f3bf183f-76b6-45eb-74d5-a970adfcfa99","status":"OK"}
 
 
-2. How to submit new order?
+How to submit new order?
 
 curl -X POST --data "{}" -H "Authorization:user" http://127.0.0.1:8080/orders
 
 {"order_id":"8cc227c0-8dac-42cf-783e-f7bcb95bf455","start_time":"2016-03-27 10:22:31.4492618 +0000 UTC"}
 
 
-3.How to Qurey the order state?
+How to Qurey the order state?
 
 curl -H "Authorization:user" http://localhost:8080/orders/8cc227c0-8dac-42cf-783e-f7bcb95bf455
 
@@ -53,4 +54,3 @@ curl -H "Authorization:user" http://localhost:8080/orders/8cc227c0-8dac-42cf-783
         }
     ]
 }
-
