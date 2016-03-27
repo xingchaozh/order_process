@@ -5,7 +5,7 @@ type ConsumerInfo struct {
 }
 
 func GetTokenInfo(token string) (*ConsumerInfo, error) {
-	// To simply design, just using token as UserID here.
+	// To simply design, just using token as UserID here
 	consumerInfo := ConsumerInfo{
 		UserID: token,
 	}

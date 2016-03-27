@@ -148,6 +148,7 @@ func (this *OrderRecord) String() string {
 	return str
 }
 
+// To map
 func (this *OrderRecord) ToMap() *map[string]interface{} {
 	stepsMap := []map[string]interface{}{}
 	for _, step := range this.Steps {
@@ -181,6 +182,7 @@ func (this *OrderRecord) ToMap() *map[string]interface{} {
 	return &recordMap
 }
 
+// Just used for query
 func (this *OrderRecord) ToMapForQuery() *map[string]interface{} {
 	stepsMap := []map[string]interface{}{}
 	for _, step := range this.Steps {
@@ -208,6 +210,7 @@ func (this *OrderRecord) ToMapForQuery() *map[string]interface{} {
 	return &recordMap
 }
 
+// Read from Database
 func Get(orderId string) (*OrderRecord, error) {
 	err := util.ValidateUUID(orderId)
 	if err != nil {

@@ -15,7 +15,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-// The max count pipeline of one Order Processing Service instance
+// The max count pipeline of per Order Processing Service Instance
 var (
 	MaxPipelineCount = 50
 )
@@ -32,7 +32,6 @@ type OrderProcessService struct {
 
 // The constructor of Order Processing Service
 func NewOrderProcessService(NewPipeline NewPipelineFunc, NewTaskHandler NewTaskHandlerFunc) *OrderProcessService {
-
 	service := OrderProcessService{
 		lastPipelineSelectedIndex: -1,
 		ServiceID:                 util.NewUUID(),

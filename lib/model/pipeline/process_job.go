@@ -10,26 +10,33 @@ import (
 type IJob interface {
 	// Job ID
 	GetJobID() string
+
 	// Step status
 	GetCurrentStep() string
 	IsCurrentStepCompleted() bool
 	IsJobInFinishingStep() bool
+
 	// Job status
 	IsJobFinished() bool
+
 	// Conversion
 	ToMap() *map[string]interface{}
 	ToJson() string
+
 	// Step
 	StartStep(stepName string) error
 	FinishCurrentStep()
+
 	// Failure
 	IsFailureOccured() bool
 	MarkJobAsFailure()
+
 	// Rollback
 	StartRollback()
 	IsJobRollbacking() bool
 	GetRollbackStep() (string, error)
 	RollbackStep(stepName string)
+
 	// Database
 	UpdateDatabase()
 }
@@ -58,7 +65,7 @@ func (this *ProcessJob) IsCurrentStepCompleted() bool {
 	return this.record.Steps[len(this.record.Steps)-1].StepCompleted
 }
 
-// Check wheather order is done
+// Check whether order is done
 func (this *ProcessJob) IsJobFinished() bool {
 	return this.record.Finished
 }

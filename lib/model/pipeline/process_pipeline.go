@@ -6,9 +6,13 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// The inteface of pipeline for Order Processing Service
 type IPipeline interface {
+	// Start the pipeline
 	Start()
+	// Append new job to pipeline
 	AppendJob(job IJob)
+	// Dispatch task to next step
 	DispatchTask(jobId string)
 }
 
@@ -49,7 +53,7 @@ type ProcessPipeline struct {
 	TaskHandlers map[string]ITaskHandler
 }
 
-// The constructor of pipeline
+// The constructor of pipeline for Order Processing Service
 func NewProcessPipeline(NewTaskHandler func(string, IPipeline) ITaskHandler) IPipeline {
 	pipeline := ProcessPipeline{
 		Jobs:         make(map[string]IJob),
@@ -132,13 +136,13 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 	return "", errors.New("cannot find next step")
 }
 
-// Finish order
+// Finish the order
 func (this *ProcessPipeline) FinishOrder(jobId string) {
 	logrus.Debugf("[%s]Finish Order", jobId)
 	logrus.Debugln()
 }
 
-// Verify wheather the step switch is valid
+// Verify whether the step switch is valid
 func VerifyStepSwitch(previousStep string, currentStep string) error {
 	for _, step := range StepsSwitchMap[previousStep] {
 		if step == currentStep {

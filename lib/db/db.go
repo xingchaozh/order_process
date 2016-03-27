@@ -53,37 +53,3 @@ func Read(stmt string, recordMap *map[string]interface{}, args ...interface{}) e
 	(*recordMap)[hashkey] = result
 	return nil
 }
-
-/*
-import (
-	"order_process/lib/util"
-)
-
-var orderRecords map[string]interface{}
-
-func InitDatabase() {
-	orderRecords = make(map[string]interface{})
-}
-
-func Write(stmt string, recordMap map[string]interface{}, args ...interface{}) error {
-	id := args[0].(string)
-	err := util.ValidateUUID(id)
-	if err != nil {
-		return err
-	}
-	orderRecords[id] = recordMap
-	return nil
-}
-
-func Read(stmt string, recordMap *map[string]interface{}, args ...interface{}) error {
-	id := args[0].(string)
-	err := util.ValidateUUID(id)
-	if err != nil {
-		return err
-	}
-	if _, ok := orderRecords[id].(map[string]interface{}); ok {
-		*recordMap = orderRecords[id].(map[string]interface{})
-	}
-	return nil
-}
-*/

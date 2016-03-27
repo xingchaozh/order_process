@@ -16,7 +16,7 @@ func NewHeartBeat(serviceID string) *HeartBeat {
 	}
 }
 
-// Heartbeat, used for heartbeat check.
+// Heartbeat, used for heartbeat check
 func (this *HeartBeat) HeartBeatHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate response
 	response := map[string]string{

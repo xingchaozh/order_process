@@ -9,6 +9,7 @@ import (
 	"github.com/nu7hatch/gouuid"
 )
 
+// Generate uuid
 func NewUUID() string {
 	t, _ := uuid.NewV4()
 	return t.String()

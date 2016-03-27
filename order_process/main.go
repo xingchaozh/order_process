@@ -20,11 +20,10 @@ func main() {
 	logrus.SetOutput(os.Stdout)
 
 	// Initilize database
-	db.InitDatabase("192.168.163.147", 6379)
+	db.InitDatabase("192.168.163.147", 6379) // TODO: read from config
 
 	// Create OrderProcessService instance and start.
-	orderProcessService := NewOrderProcessService(pipeline.NewProcessPipeline,
-		pipeline.NewStepTaskHandler)
+	orderProcessService := NewOrderProcessService(pipeline.NewProcessPipeline, pipeline.NewStepTaskHandler)
 	err := orderProcessService.Start()
 	if err != nil {
 		log.Fatal(err)

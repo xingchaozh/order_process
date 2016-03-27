@@ -8,9 +8,13 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// The interface of task handler for Order Step Processing
 type ITaskHandler interface {
+	// Start perform tasks
 	PerformTasks()
+	// Append new task
 	AppendTask(job IJob)
+	// Rollback current task if failure
 	Rollback()
 }
 
@@ -32,6 +36,7 @@ const (
 	StepProcessTime      = 5 //seconds
 )
 
+// The constructor of task handler for Order Step Processing
 func NewStepTaskHandler(stepTaskType string, pipeLine IPipeline) ITaskHandler {
 	return &ProcessStepTaskHandler{
 		StepTaskType: stepTaskType,
