@@ -3,19 +3,12 @@ package order
 import (
 	"encoding/json"
 	"errors"
-	"order_process/lib/db"
-	"order_process/lib/util"
+	"order_process/process/db"
+	"order_process/process/util"
 	"time"
 )
 
-type OrderStep struct {
-	StepName       string `json:"step_name"`
-	StartTime      string `json:"step_start_time"`
-	CompleteTime   string `json:"step_complete_time"`
-	StepCompleted  bool   `json:"step_completed"`
-	StepRollbacked bool   `json:"step_rollbacked"`
-}
-
+// The definition of Order
 type OrderRecord struct {
 	OrderID        string      `json:"order_id"`
 	CurrentStep    string      `json:"current_step"`
@@ -27,6 +20,15 @@ type OrderRecord struct {
 	FailureOccured bool        `json:"failure_occured"`
 	ServiceID      string      `json:"service_id"`
 	RollbackState  string      `json:"rollback_state"`
+}
+
+// The definition of Order Step
+type OrderStep struct {
+	StepName       string `json:"step_name"`
+	StartTime      string `json:"step_start_time"`
+	CompleteTime   string `json:"step_complete_time"`
+	StepCompleted  bool   `json:"step_completed"`
+	StepRollbacked bool   `json:"step_rollbacked"`
 }
 
 // New order record
@@ -54,8 +56,7 @@ func New(record map[string]interface{}) (*OrderRecord, error) {
 		return nil, err
 	}
 
-	str, err := orderRecord.ToJson()
-	err = db.Write(str, nil, "Order", id)
+	err = orderRecord.SaveToDB("Active")
 	if err != nil {
 		return nil, err
 	}
@@ -143,11 +144,6 @@ func (this *OrderRecord) ToJson() (string, error) {
 	return string(jsonOrderRecord), nil
 }
 
-func (this *OrderRecord) String() string {
-	str, _ := this.ToJson()
-	return str
-}
-
 // To map
 func (this *OrderRecord) ToMap() *map[string]interface{} {
 	stepsMap := []map[string]interface{}{}
@@ -182,8 +178,17 @@ func (this *OrderRecord) ToMap() *map[string]interface{} {
 	return &recordMap
 }
 
+// To json file
+func (this *OrderRecord) ToJsonForUser() (string, error) {
+	jsonOrderRecord, err := json.Marshal(this.ToMapForUser())
+	if err != nil {
+		return "", err
+	}
+	return string(jsonOrderRecord), nil
+}
+
 // Just used for query
-func (this *OrderRecord) ToMapForQuery() *map[string]interface{} {
+func (this *OrderRecord) ToMapForUser() *map[string]interface{} {
 	stepsMap := []map[string]interface{}{}
 	for _, step := range this.Steps {
 		stepMap := map[string]interface{}{
@@ -201,7 +206,6 @@ func (this *OrderRecord) ToMapForQuery() *map[string]interface{} {
 		"current_step": this.CurrentStep,
 		"start_time":   this.StartTime,
 		"steps":        stepsMap,
-		"finished":     this.Finished,
 	}
 
 	if this.Finished {
@@ -210,14 +214,37 @@ func (this *OrderRecord) ToMapForQuery() *map[string]interface{} {
 	return &recordMap
 }
 
+func (this *OrderRecord) SaveToDB(orderStateInService string) error {
+	str, err := this.ToJson()
+	err = db.Write(str, "Orders", this.OrderID)
+	if err != nil {
+		return err
+	}
+	err = db.Write(orderStateInService, "ServiceOrderMap:"+this.ServiceID, this.OrderID)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Read from Database
+func ReadFromDB(orderID string) (map[string]interface{}, error) {
+	recordMap := make(map[string]interface{})
+	err := db.Read("", recordMap, "Orders", orderID)
+	if err != nil {
+		return nil, err
+	}
+	return recordMap, nil
+}
+
+// Retrieve order record from database
 func Get(orderId string) (*OrderRecord, error) {
 	err := util.ValidateUUID(orderId)
 	if err != nil {
 		return nil, err
 	}
-	recordMap := make(map[string]interface{})
-	db.Read("", &recordMap, "Order", orderId)
+
+	recordMap, err := ReadFromDB(orderId)
 
 	t := make(map[string]interface{})
 	err = json.Unmarshal(recordMap[orderId].([]byte), &t)

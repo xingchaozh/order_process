@@ -2,8 +2,7 @@ package pipeline
 
 import (
 	"errors"
-	"order_process/lib/db"
-	"order_process/lib/model/order"
+	"order_process/process/model/order"
 	"time"
 )
 
@@ -37,8 +36,11 @@ type IJob interface {
 	GetRollbackStep() (string, error)
 	RollbackStep(stepName string)
 
-	// Database
+	// Save to database
 	UpdateDatabase()
+
+	// Finalize
+	FinalizeJob() error
 }
 
 type ProcessJob struct {
@@ -104,6 +106,7 @@ func (this *ProcessJob) StartStep(stepName string) error {
 	this.record.CurrentStep = orderStep.StepName
 	this.record.Steps = append(this.record.Steps, orderStep)
 
+	this.UpdateDatabase()
 	return nil
 }
 
@@ -113,10 +116,22 @@ func (this *ProcessJob) FinishCurrentStep() {
 	step.StepCompleted = true
 	step.CompleteTime = time.Now().UTC().String()
 
-	if this.IsJobInFinishingStep() {
+	if this.IsJobInFinishingStep() && !this.IsJobRollbacking() {
 		this.record.CompleteTime = step.CompleteTime
 		this.record.Finished = true
 	}
+	this.UpdateDatabase()
+}
+
+func (this *ProcessJob) FinalizeJob() error {
+	if this.IsJobInFinishingStep() && !this.IsJobRollbacking() {
+		this.record.CompleteTime = time.Now().UTC().String()
+		this.record.Finished = true
+
+		this.UpdateDatabase()
+		return nil
+	}
+	return errors.New("Job not ready to be finished")
 }
 
 func (this *ProcessJob) IsFailureOccured() bool {
@@ -171,8 +186,13 @@ func (this *ProcessJob) RollbackStep(stepName string) {
 			break
 		}
 	}
+	this.UpdateDatabase()
 }
 
 func (this *ProcessJob) UpdateDatabase() {
-	db.Write(this.ToJson(), nil, "Order", this.GetJobID())
+	orderStateInService := "Active"
+	if this.IsJobFinished() && !this.IsJobRollbacking() {
+		orderStateInService = "Completed"
+	}
+	this.record.SaveToDB(orderStateInService)
 }

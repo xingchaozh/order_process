@@ -88,7 +88,7 @@ func (this *ProcessPipeline) AppendJob(job IJob) {
 // Dispatch the task
 func (this *ProcessPipeline) DispatchTask(jobId string) {
 	job := this.Jobs[jobId]
-	if job.IsJobFinished() && !job.IsJobRollbacking() {
+	if job.IsJobInFinishingStep() && !job.IsJobRollbacking() {
 		this.FinishOrder(jobId)
 		return
 	}
@@ -114,7 +114,7 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 		return job.GetCurrentStep(), nil
 	}
 
-	if job.IsJobRollbacking() {
+	if job.IsJobRollbacking() && job.IsJobInFinishingStep() {
 		nextRollbackStep, err := job.GetRollbackStep()
 		if err != nil {
 			return "", err
@@ -140,6 +140,7 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 func (this *ProcessPipeline) FinishOrder(jobId string) {
 	logrus.Debugf("[%s]Finish Order", jobId)
 	logrus.Debugln()
+	this.Jobs[jobId].FinalizeJob()
 }
 
 // Verify whether the step switch is valid

@@ -2,7 +2,7 @@ package pipeline
 
 import (
 	"errors"
-	"order_process/lib/util"
+	"order_process/process/util"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -10,20 +10,17 @@ import (
 
 // The interface of task handler for Order Step Processing
 type ITaskHandler interface {
-	// Start perform tasks
-	PerformTasks()
 	// Append new task
 	AppendTask(job IJob)
+
+	// Start perform tasks
+	PerformTasks()
+
 	// Rollback current task if failure
 	Rollback()
 }
 
-type message struct {
-	r      map[string]interface{}
-	status string
-	err    error
-}
-
+// The dedicated step task handler
 type ProcessStepTaskHandler struct {
 	StepTaskType   string
 	PendingTasks   chan IJob
@@ -45,6 +42,10 @@ func NewStepTaskHandler(stepTaskType string, pipeLine IPipeline) ITaskHandler {
 	}
 }
 
+func (this *ProcessStepTaskHandler) AppendTask(job IJob) {
+	this.PendingTasks <- job.(*ProcessJob)
+}
+
 func (this *ProcessStepTaskHandler) PerformTasks() {
 	for this.CurentStepTask = range this.PendingTasks {
 		this.HandleCurrentTask()
@@ -54,11 +55,10 @@ func (this *ProcessStepTaskHandler) PerformTasks() {
 func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 	logrus.Debugf("[%s]handling step[%s]", this.CurentStepTask.GetJobID(), this.StepTaskType)
 
-	this.StartStep()
-
-	if this.CurentStepTask.IsJobRollbacking() {
+	if this.CurentStepTask.IsJobRollbacking() && this.StepTaskType != "Failed" {
 		this.Rollback()
 	} else {
+		this.StartStep()
 		// Simulate the processing of current order step
 		if !this.CurentStepTask.IsJobInFinishingStep() {
 			time.Sleep(time.Second * StepProcessTime)
@@ -68,6 +68,9 @@ func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 		if util.IsEventWithSpecifiedRatioHappens() && !this.CurentStepTask.IsJobInFinishingStep() {
 			this.CurentStepTask.MarkJobAsFailure()
 
+			// Trigger roll back
+			this.CurentStepTask.StartRollback()
+
 			logrus.Debugf("[%s]Failure occurs when handling step[%s]",
 				this.CurentStepTask.GetJobID(), this.CurentStepTask.GetCurrentStep())
 		} else {
@@ -75,20 +78,14 @@ func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 		}
 	}
 
-	this.PipeLine.DispatchTask(this.CurentStepTask.GetJobID())
+	go this.PipeLine.DispatchTask(this.CurentStepTask.GetJobID())
 	return nil
-}
-
-func (this *ProcessStepTaskHandler) AppendTask(job IJob) {
-	this.PendingTasks <- job.(*ProcessJob)
 }
 
 func (this *ProcessStepTaskHandler) Rollback() {
 	logrus.Debugf("[%s]Rollback step[%s]", this.CurentStepTask.GetJobID(), this.StepTaskType)
 
 	this.CurentStepTask.RollbackStep(this.StepTaskType)
-
-	this.CurentStepTask.UpdateDatabase()
 }
 
 func (this *ProcessStepTaskHandler) StartStep() error {
@@ -99,8 +96,6 @@ func (this *ProcessStepTaskHandler) StartStep() error {
 	}
 
 	job.StartStep(this.StepTaskType)
-
-	job.UpdateDatabase()
 
 	logrus.Debugf("[%s]Start step[%s]", job.GetJobID(), job.GetCurrentStep())
 	return nil
@@ -113,12 +108,6 @@ func (this *ProcessStepTaskHandler) FinishStep() error {
 	}
 
 	job.FinishCurrentStep()
-
-	if job.IsFailureOccured() && !job.IsJobRollbacking() {
-		job.StartRollback()
-	}
-
-	job.UpdateDatabase()
 
 	logrus.Debugf("[%s]Finish step[%s]", job.GetJobID(), job.GetCurrentStep())
 	return nil

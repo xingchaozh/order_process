@@ -1,14 +1,16 @@
 package db
 
 import (
+	"order_process/process/util"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/alphazero/Go-Redis"
-	"order_process/lib/util"
 )
 
 type IDatabase interface {
-	Write(stmt string, recordMap map[string]interface{}, args ...interface{}) error
+	Write(stmt string, args ...interface{}) error
 	Read(stmt string, recordMap *map[string]interface{}, args ...interface{}) error
+	Query(stmt string, args ...interface{}) ([]map[string]interface{}, error)
 }
 
 type RedisDatabase struct {
@@ -20,11 +22,14 @@ var redisDB RedisDatabase
 func InitDatabase(addr string, port int) error {
 	spec := redis.DefaultSpec().Host(addr).Port(port)
 	client, err := redis.NewSynchClientWithSpec(spec)
+	if err != nil {
+		return err
+	}
 	redisDB.client = client
-	return err
+	return nil
 }
 
-func Write(stmt string, recordMap map[string]interface{}, args ...interface{}) error {
+func Write(stmt string, args ...interface{}) error {
 	key := args[0].(string)
 	hashkey := args[1].(string)
 	err := util.ValidateUUID(hashkey)
@@ -38,7 +43,7 @@ func Write(stmt string, recordMap map[string]interface{}, args ...interface{}) e
 	return nil
 }
 
-func Read(stmt string, recordMap *map[string]interface{}, args ...interface{}) error {
+func Read(stmt string, recordMap map[string]interface{}, args ...interface{}) error {
 	key := args[0].(string)
 	hashkey := args[1].(string)
 	err := util.ValidateUUID(hashkey)
@@ -50,6 +55,26 @@ func Read(stmt string, recordMap *map[string]interface{}, args ...interface{}) e
 		logrus.Error(err)
 		return err
 	}
-	(*recordMap)[hashkey] = result
+	recordMap[hashkey] = result
 	return nil
+}
+
+func Query(stmt string, args ...interface{}) ([]map[string]interface{}, error) {
+	key := args[0].(string)
+	result, err := redisDB.client.Hgetall(key)
+	if err != nil {
+		logrus.Error(err)
+		return nil, err
+	}
+
+	var maps []map[string]interface{}
+	index := 0
+	for _, bytes := range result {
+		record := map[string]interface{}{
+			string(index): string(bytes),
+		}
+		maps = append(maps, record)
+		index++
+	}
+	return maps, nil
 }

@@ -1,0 +1,4 @@
+; Log config
+
+[env "dev"]
+loglevel = debug
