@@ -27,5 +27,5 @@ func ValidateUUID(uuid string) error {
 // Is event with 5% ratio happens
 func IsEventWithSpecifiedRatioHappens() bool {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	return r.Intn(100/20) == 0
+	return r.Intn(100/5) == 0
 }

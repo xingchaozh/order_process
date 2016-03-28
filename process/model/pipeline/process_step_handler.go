@@ -42,16 +42,19 @@ func NewStepTaskHandler(stepTaskType string, pipeLine IPipeline) ITaskHandler {
 	}
 }
 
+// Append task to pending list
 func (this *ProcessStepTaskHandler) AppendTask(job IJob) {
 	this.PendingTasks <- job.(*ProcessJob)
 }
 
+// Loop the pending list and process
 func (this *ProcessStepTaskHandler) PerformTasks() {
 	for this.CurentStepTask = range this.PendingTasks {
 		this.HandleCurrentTask()
 	}
 }
 
+// Handle the task
 func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 	logrus.Debugf("[%s]handling step[%s]", this.CurentStepTask.GetJobID(), this.StepTaskType)
 
@@ -71,7 +74,7 @@ func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 			// Trigger roll back
 			this.CurentStepTask.StartRollback()
 
-			logrus.Debugf("[%s]Failure occurs when handling step[%s]",
+			logrus.Debugf("[%s]Error occurs when handling step[%s]",
 				this.CurentStepTask.GetJobID(), this.CurentStepTask.GetCurrentStep())
 		} else {
 			this.FinishStep()
@@ -82,12 +85,14 @@ func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 	return nil
 }
 
+// Handle the rollback operation
 func (this *ProcessStepTaskHandler) Rollback() {
 	logrus.Debugf("[%s]Rollback step[%s]", this.CurentStepTask.GetJobID(), this.StepTaskType)
 
 	this.CurentStepTask.RollbackStep(this.StepTaskType)
 }
 
+// Start current step
 func (this *ProcessStepTaskHandler) StartStep() error {
 	job := this.CurentStepTask
 	err := VerifyStepSwitch(job.GetCurrentStep(), this.StepTaskType)
@@ -101,6 +106,7 @@ func (this *ProcessStepTaskHandler) StartStep() error {
 	return nil
 }
 
+// Finish current step
 func (this *ProcessStepTaskHandler) FinishStep() error {
 	job := this.CurentStepTask
 	if this.StepTaskType != job.GetCurrentStep() {

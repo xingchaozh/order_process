@@ -24,7 +24,7 @@ var (
 // Order Processing Service
 type OrderProcessService struct {
 	ServiceID       string
-	PipelineManager *pipeline.ProcessPipelineManager
+	PipelineManager pipeline.IPipelineManager
 }
 
 // The constructor of Order Processing Service
@@ -68,8 +68,8 @@ func (this *OrderProcessService) CreateOrder(w http.ResponseWriter, r *http.Requ
 	orderRecord, _ := order.New(t)
 	logrus.Debugf("New order created with ID: [%v]", orderRecord.OrderID)
 
-	// Create order processing job according to order record and process
-	// asynchronously using selected pipeline by PipelineManager
+	// Create order processing job according to order record and
+	// process asynchronously using selected pipeline by PipelineManager
 	this.PipelineManager.DispatchOrder(orderRecord)
 
 	// Generate response
@@ -78,7 +78,6 @@ func (this *OrderProcessService) CreateOrder(w http.ResponseWriter, r *http.Requ
 		"start_time": orderRecord.StartTime,
 	}
 	str, _ := json.Marshal(response)
-	//str, _ := orderRecord.ToJson()
 	w.Header().Add("Content-Type", "application/json")
 	fmt.Fprint(w, string(str))
 }
@@ -95,6 +94,7 @@ func (this *OrderProcessService) QureyOrder(w http.ResponseWriter, r *http.Reque
 	id := mux.Vars(r)["id"]
 	logrus.Debugf("Get /orders/[%v] ", id)
 
+	// Retrieve order record
 	record, err := order.Get(id)
 	if err != nil {
 		w.WriteHeader(404)
@@ -102,7 +102,7 @@ func (this *OrderProcessService) QureyOrder(w http.ResponseWriter, r *http.Reque
 	}
 
 	str, _ := record.ToJsonForUser()
-
+	//str, _ := record.ToJson()
 	w.Header().Add("Content-Type", "application/json")
 	fmt.Fprint(w, tokenInfo.UserID, str)
 }
@@ -135,7 +135,7 @@ func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request
 	logrus.Debugf("POST /service/transfer RequestBody: [%v]", t)
 
 	if tranferredServiceId, ok := t["service_id"].(string); ok {
-		// transfer
+		// transfer the orders to current service
 		go transfer.Transfer(tranferredServiceId, this.PipelineManager)
 
 		// Generate response
@@ -153,6 +153,7 @@ func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// Get current service id
 func (this *OrderProcessService) GetServiceID() string {
 	return this.ServiceID
 }

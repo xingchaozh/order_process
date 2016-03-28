@@ -85,7 +85,7 @@ func (this *ProcessPipeline) AppendJob(job IJob) {
 	this.DispatchTask(job.GetJobID())
 }
 
-// Dispatch the task
+// Dispatch the task to next task handler
 func (this *ProcessPipeline) DispatchTask(jobId string) {
 	job := this.Jobs[jobId]
 	if job.IsJobInFinishingStep() && !job.IsJobRollbacking() {
@@ -110,7 +110,7 @@ func (this *ProcessPipeline) DispatchTask(jobId string) {
 func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 	job := this.Jobs[jobId]
 
-	if !job.IsCurrentStepCompleted() && !job.IsFailureOccured() {
+	if !job.IsCurrentStepCompleted() && !job.IsErrorOccured() {
 		return job.GetCurrentStep(), nil
 	}
 
@@ -124,7 +124,7 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 
 	if nextSteps, found := StepsSwitchNextMap[job.GetCurrentStep()]; found {
 		if !job.IsJobInFinishingStep() {
-			if !job.IsFailureOccured() {
+			if !job.IsErrorOccured() {
 				return nextSteps[0], nil
 			} else {
 				return nextSteps[1], nil
@@ -136,7 +136,7 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 	return "", errors.New("cannot find next step")
 }
 
-// Finish the order
+// Finalize the order if no more process is needed.
 func (this *ProcessPipeline) FinishOrder(jobId string) {
 	logrus.Debugf("[%s]Finish Order", jobId)
 	logrus.Debugln()

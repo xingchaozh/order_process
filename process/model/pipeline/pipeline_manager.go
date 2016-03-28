@@ -4,16 +4,19 @@ import (
 	"order_process/process/model/order"
 )
 
+// The interface of Pipleline Manager
 type IPipelineManager interface {
 	DispatchOrder(orderRecord *order.OrderRecord)
 	Start()
 }
 
+// The definition of Order Process Pipeline Manager
 type ProcessPipelineManager struct {
 	pipelines                 []IPipeline
 	lastPipelineSelectedIndex int
 }
 
+// The constructor of Order Process Pipeline Manager
 func NewProcessPipelineManager(MaxPipelineCount int, NewPipeline func(func(string, IPipeline) ITaskHandler) IPipeline,
 	NewTaskHandler func(string, IPipeline) ITaskHandler) *ProcessPipelineManager {
 	pipelineManager := ProcessPipelineManager{
@@ -25,12 +28,14 @@ func NewProcessPipelineManager(MaxPipelineCount int, NewPipeline func(func(strin
 	return &pipelineManager
 }
 
+// Start the pipeline management and pipelines
 func (this *ProcessPipelineManager) Start() {
 	for _, pipeline := range this.pipelines {
 		pipeline.Start()
 	}
 }
 
+// Dispatch order assigned to pipeline manager
 func (this *ProcessPipelineManager) DispatchOrder(orderRecord *order.OrderRecord) {
 	processJob := NewProcessJob(orderRecord)
 	this.SelectPipeline().AppendJob(processJob)

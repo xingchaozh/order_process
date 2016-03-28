@@ -144,7 +144,7 @@ func (this *OrderRecord) ToJson() (string, error) {
 	return string(jsonOrderRecord), nil
 }
 
-// To map
+// To map format
 func (this *OrderRecord) ToMap() *map[string]interface{} {
 	stepsMap := []map[string]interface{}{}
 	for _, step := range this.Steps {
@@ -214,6 +214,7 @@ func (this *OrderRecord) ToMapForUser() *map[string]interface{} {
 	return &recordMap
 }
 
+// Save current order data to database
 func (this *OrderRecord) SaveToDB(orderStateInService string) error {
 	str, err := this.ToJson()
 	err = db.Write(str, "Orders", this.OrderID)

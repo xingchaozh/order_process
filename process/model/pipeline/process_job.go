@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// The job interface
 type IJob interface {
 	// Job ID
 	GetJobID() string
@@ -27,7 +28,7 @@ type IJob interface {
 	FinishCurrentStep()
 
 	// Failure
-	IsFailureOccured() bool
+	IsErrorOccured() bool
 	MarkJobAsFailure()
 
 	// Rollback
@@ -43,11 +44,13 @@ type IJob interface {
 	FinalizeJob() error
 }
 
+// The defination of Order Processing Job
 type ProcessJob struct {
 	record *order.OrderRecord
 	JobId  string
 }
 
+// The construtor of Order Processing Job
 func NewProcessJob(rec *order.OrderRecord) *ProcessJob {
 	return &ProcessJob{
 		record: rec,
@@ -55,14 +58,17 @@ func NewProcessJob(rec *order.OrderRecord) *ProcessJob {
 	}
 }
 
+// Get the job id
 func (this *ProcessJob) GetJobID() string {
 	return this.record.OrderID
 }
 
+// Get current order step
 func (this *ProcessJob) GetCurrentStep() string {
 	return this.record.CurrentStep
 }
 
+// Check whether current step is done.
 func (this *ProcessJob) IsCurrentStepCompleted() bool {
 	return this.record.Steps[len(this.record.Steps)-1].StepCompleted
 }
@@ -72,15 +78,17 @@ func (this *ProcessJob) IsJobFinished() bool {
 	return this.record.Finished
 }
 
+// Check whether order is in final step("Completed" or "Failed")
 func (this *ProcessJob) IsJobInFinishingStep() bool {
 	return this.record.CurrentStep == "Completed" || this.record.CurrentStep == "Failed"
 }
 
+// To map format
 func (this *ProcessJob) ToMap() *map[string]interface{} {
 	return this.record.ToMap()
 }
 
-//ToJson() string
+// To json format
 func (this *ProcessJob) ToJson() string {
 	str, err := this.record.ToJson()
 	if err != nil {
@@ -95,7 +103,7 @@ func (this *ProcessJob) StartStep(stepName string) error {
 		return errors.New("The step has started")
 	}
 
-	if !this.IsCurrentStepCompleted() && !this.IsFailureOccured() {
+	if !this.IsCurrentStepCompleted() && !this.IsErrorOccured() {
 		return errors.New("Last step not completed")
 	}
 
@@ -123,6 +131,7 @@ func (this *ProcessJob) FinishCurrentStep() {
 	this.UpdateDatabase()
 }
 
+// Finalize job
 func (this *ProcessJob) FinalizeJob() error {
 	if this.IsJobInFinishingStep() && !this.IsJobRollbacking() {
 		this.record.CompleteTime = time.Now().UTC().String()
@@ -134,18 +143,22 @@ func (this *ProcessJob) FinalizeJob() error {
 	return errors.New("Job not ready to be finished")
 }
 
-func (this *ProcessJob) IsFailureOccured() bool {
+// Check whether error occures during processing.
+func (this *ProcessJob) IsErrorOccured() bool {
 	return this.record.FailureOccured
 }
 
+// Mark the job as failure if error occurs
 func (this *ProcessJob) MarkJobAsFailure() {
 	this.record.FailureOccured = true
 }
 
+// Trigger the rollback process
 func (this *ProcessJob) StartRollback() {
 	this.record.RollbackState = "triggered"
 }
 
+// Check whether job is rollbacking.
 func (this *ProcessJob) IsJobRollbacking() bool {
 	if this.record.RollbackState == "triggered" {
 		index := len(this.record.Steps) - 1
@@ -161,6 +174,7 @@ func (this *ProcessJob) IsJobRollbacking() bool {
 	return false
 }
 
+// Get the step which needs rollback
 func (this *ProcessJob) GetRollbackStep() (string, error) {
 	index := len(this.record.Steps) - 1
 	for ; index >= 0; index-- {
@@ -177,6 +191,7 @@ func (this *ProcessJob) GetRollbackStep() (string, error) {
 	}
 }
 
+// Perform the rollback of specified step
 func (this *ProcessJob) RollbackStep(stepName string) {
 	index := len(this.record.Steps) - 1
 	for ; index >= 0; index-- {
@@ -189,6 +204,7 @@ func (this *ProcessJob) RollbackStep(stepName string) {
 	this.UpdateDatabase()
 }
 
+// Update current job data to database
 func (this *ProcessJob) UpdateDatabase() {
 	orderStateInService := "Active"
 	if this.IsJobFinished() && !this.IsJobRollbacking() {

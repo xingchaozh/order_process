@@ -6,17 +6,19 @@ import (
 	"net/http"
 )
 
+// The definition of heart beat check
 type HeartBeat struct {
 	ServiceID string
 }
 
+// The constructor of heart beat check
 func NewHeartBeat(serviceID string) *HeartBeat {
 	return &HeartBeat{
 		ServiceID: serviceID,
 	}
 }
 
-// Heartbeat, used for heartbeat check
+// Heartbeat API handler, used for heartbeat check
 func (this *HeartBeat) HeartBeatHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate response
 	response := map[string]string{
