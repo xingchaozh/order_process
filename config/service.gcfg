@@ -1,0 +1,4 @@
+; Serive config
+
+[env "dev"]
+port = 8080

@@ -14,18 +14,14 @@ type IJob interface {
 	// Step status
 	GetCurrentStep() string
 	IsCurrentStepCompleted() bool
-	IsJobInFinishingStep() bool
-
-	// Job status
-	IsJobFinished() bool
-
-	// Conversion
-	ToMap() *map[string]interface{}
-	ToJson() string
 
 	// Step
 	StartStep(stepName string) error
 	FinishCurrentStep()
+
+	// Job status
+	IsJobInFinishingStep() bool
+	IsJobFinished() bool
 
 	// Failure
 	IsErrorOccured() bool
@@ -42,6 +38,10 @@ type IJob interface {
 
 	// Finalize
 	FinalizeJob() error
+
+	// Conversion
+	ToMap() *map[string]interface{}
+	ToJson() string
 }
 
 // The defination of Order Processing Job

@@ -11,13 +11,16 @@ import (
 // The interface of task handler for Order Step Processing
 type ITaskHandler interface {
 	// Append new task
-	AppendTask(job IJob)
+	AppendTask(job IJob) error
 
 	// Start perform tasks
 	PerformTasks()
 
 	// Rollback current task if failure
 	Rollback()
+
+	// Stop the task handler
+	Stop()
 }
 
 // The dedicated step task handler
@@ -26,6 +29,7 @@ type ProcessStepTaskHandler struct {
 	PendingTasks   chan IJob
 	CurentStepTask IJob
 	PipeLine       IPipeline
+	stopped        bool
 }
 
 const (
@@ -39,18 +43,27 @@ func NewStepTaskHandler(stepTaskType string, pipeLine IPipeline) ITaskHandler {
 		StepTaskType: stepTaskType,
 		PendingTasks: make(chan IJob, MaxPendingTasksCount),
 		PipeLine:     pipeLine,
+		stopped:      false,
 	}
 }
 
 // Append task to pending list
-func (this *ProcessStepTaskHandler) AppendTask(job IJob) {
-	this.PendingTasks <- job.(*ProcessJob)
+func (this *ProcessStepTaskHandler) AppendTask(job IJob) error {
+	if !this.stopped {
+		this.PendingTasks <- job.(*ProcessJob)
+		return nil
+	}
+	return errors.New("The target task handler has been stopped.")
 }
 
 // Loop the pending list and process
 func (this *ProcessStepTaskHandler) PerformTasks() {
 	for this.CurentStepTask = range this.PendingTasks {
 		this.HandleCurrentTask()
+
+		if this.stopped {
+			break
+		}
 	}
 }
 
@@ -74,7 +87,7 @@ func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 			// Trigger roll back
 			this.CurentStepTask.StartRollback()
 
-			logrus.Debugf("[%s]Error occurs when handling step[%s]",
+			logrus.Debugf("[%s]Failure occurs when handling step[%s]",
 				this.CurentStepTask.GetJobID(), this.CurentStepTask.GetCurrentStep())
 		} else {
 			this.FinishStep()
@@ -117,4 +130,12 @@ func (this *ProcessStepTaskHandler) FinishStep() error {
 
 	logrus.Debugf("[%s]Finish step[%s]", job.GetJobID(), job.GetCurrentStep())
 	return nil
+}
+
+// Stop the task handler
+func (this *ProcessStepTaskHandler) Stop() {
+	if !this.stopped {
+		this.stopped = true
+		close(this.PendingTasks)
+	}
 }

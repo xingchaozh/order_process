@@ -221,7 +221,18 @@ func (this *OrderRecord) SaveToDB(orderStateInService string) error {
 	if err != nil {
 		return err
 	}
-	err = db.Write(orderStateInService, "ServiceOrderMap:"+this.ServiceID, this.OrderID)
+	return UpdateOrderStateInService(this.ServiceID, this.OrderID, orderStateInService)
+}
+
+func UpdateOrderStateInService(serviceID string, orderId string, orderStateInService string) error {
+	// Update order state in service order list.
+	// Generate service information
+	regInfo := map[string]string{
+		"order_id":               orderId,
+		"order_state_in_service": orderStateInService,
+	}
+	regInfoJson, _ := json.Marshal(regInfo)
+	err := db.Write(string(regInfoJson), "ServiceOrderMap:"+serviceID, orderId)
 	if err != nil {
 		return err
 	}

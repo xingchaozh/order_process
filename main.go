@@ -3,7 +3,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"order_process/process/db"
 	"order_process/process/env"
 	"os"
@@ -24,14 +23,14 @@ func main() {
 	// Initialize database
 	err := db.InitDatabase(env.RedisConfig.Host, env.RedisConfig.Port)
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 		return
 	}
 
 	// Create OrderProcessService instance and start.
-	orderProcessService := NewOrderProcessService()
+	orderProcessService := NewOrderProcessService(&env.ServiceConfig)
 	err = orderProcessService.Start()
 	if err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 }

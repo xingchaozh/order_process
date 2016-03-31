@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"errors"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -14,6 +15,8 @@ type IPipeline interface {
 	AppendJob(job IJob)
 	// Dispatch task to next step
 	DispatchTask(jobId string)
+	// Stop the pipeline
+	Stop()
 }
 
 var ProcessSteps = []string{
@@ -51,6 +54,7 @@ const (
 type ProcessPipeline struct {
 	Jobs         map[string]IJob
 	TaskHandlers map[string]ITaskHandler
+	lock         sync.Mutex
 }
 
 // The constructor of pipeline for Order Processing Service
@@ -78,9 +82,12 @@ func (this *ProcessPipeline) AppendJob(job IJob) {
 		logrus.Errorf("ProcessJob existed:[%v]", job.GetJobID())
 		return
 	}
-	// Insert job
-	this.Jobs[job.GetJobID()] = job
-
+	{
+		defer this.lock.Unlock()
+		this.lock.Lock()
+		// Insert job
+		this.Jobs[job.GetJobID()] = job
+	}
 	// Schedule the job immediately
 	this.DispatchTask(job.GetJobID())
 }
@@ -89,7 +96,7 @@ func (this *ProcessPipeline) AppendJob(job IJob) {
 func (this *ProcessPipeline) DispatchTask(jobId string) {
 	job := this.Jobs[jobId]
 	if job.IsJobInFinishingStep() && !job.IsJobRollbacking() {
-		this.FinishOrder(jobId)
+		this.FinishJob(jobId)
 		return
 	}
 
@@ -137,10 +144,24 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 }
 
 // Finalize the order if no more process is needed.
-func (this *ProcessPipeline) FinishOrder(jobId string) {
+func (this *ProcessPipeline) FinishJob(jobId string) {
 	logrus.Debugf("[%s]Finish Order", jobId)
 	logrus.Debugln()
 	this.Jobs[jobId].FinalizeJob()
+
+	{
+		defer this.lock.Unlock()
+		this.lock.Lock()
+		// Remove job from cached mapping
+		delete(this.Jobs, jobId)
+	}
+}
+
+// Stop the pipeline
+func (this *ProcessPipeline) Stop() {
+	for _, handler := range this.TaskHandlers {
+		handler.Stop()
+	}
 }
 
 // Verify whether the step switch is valid

@@ -6,8 +6,12 @@ import (
 
 // The interface of Pipleline Manager
 type IPipelineManager interface {
+	// Dispatch orders
 	DispatchOrder(orderRecord *order.OrderRecord)
+	// Start the pipeline manager
 	Start()
+	// Stop the pipeline manager
+	Stop()
 }
 
 // The definition of Order Process Pipeline Manager
@@ -28,6 +32,12 @@ func NewProcessPipelineManager(MaxPipelineCount int, NewPipeline func(func(strin
 	return &pipelineManager
 }
 
+// Dispatch order assigned to pipeline manager
+func (this *ProcessPipelineManager) DispatchOrder(orderRecord *order.OrderRecord) {
+	processJob := NewProcessJob(orderRecord)
+	this.SelectPipeline().AppendJob(processJob)
+}
+
 // Start the pipeline management and pipelines
 func (this *ProcessPipelineManager) Start() {
 	for _, pipeline := range this.pipelines {
@@ -35,10 +45,11 @@ func (this *ProcessPipelineManager) Start() {
 	}
 }
 
-// Dispatch order assigned to pipeline manager
-func (this *ProcessPipelineManager) DispatchOrder(orderRecord *order.OrderRecord) {
-	processJob := NewProcessJob(orderRecord)
-	this.SelectPipeline().AppendJob(processJob)
+// Stop the pipeline management and pipelines
+func (this *ProcessPipelineManager) Stop() {
+	for _, pipeline := range this.pipelines {
+		pipeline.Stop()
+	}
 }
 
 // Round Robin Select pipeline

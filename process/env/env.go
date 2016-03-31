@@ -9,9 +9,10 @@ import (
 
 // The path of configuration files
 const (
-	REDIS_CFG_FILE = "config/database.gcfg"
-	LOG_CFG_FILE   = "config/log.gcfg"
-	ServiceName    = "order_process"
+	REDIS_CFG_FILE   = "config/database.gcfg"
+	LOG_CFG_FILE     = "config/log.gcfg"
+	SERVICE_CFG_FILE = "config/service.gcfg"
+	ServiceName      = "order_process"
 )
 
 // The defination of redis configuration
@@ -25,17 +26,24 @@ type LogCfg struct {
 	Loglevel string `json:"log_level"`
 }
 
+// The definition of service configuration
+type ServiceCfg struct {
+	Port int `json:"port"`
+}
+
 // The definition of service environment
 type Env struct {
-	RedisConfig RedisCfg
-	LogConfig   LogCfg
+	RedisConfig   RedisCfg
+	LogConfig     LogCfg
+	ServiceConfig ServiceCfg
 }
 
 // The constuctor of environment
 func New() *Env {
-	redisConfig := RedisCfg{}
 	return &Env{
-		RedisConfig: redisConfig,
+		RedisConfig:   RedisCfg{},
+		LogConfig:     LogCfg{},
+		ServiceConfig: ServiceCfg{},
 	}
 }
 
@@ -62,6 +70,16 @@ func (env *Env) InitEnv() *Env {
 		logrus.Error(err)
 	}
 
+	// Load service configuration from file
+	type ServiceCfgs struct {
+		Env map[string]*ServiceCfg
+	}
+	var serviceCfgs ServiceCfgs
+	err = gcfg.ReadFileInto(&serviceCfgs, SERVICE_CFG_FILE)
+	if err != nil {
+		logrus.Error(err)
+	}
+
 	// Get the chapter of configurations
 	orderProcessEnv := os.Getenv("ORDER_PROCESSING_SERVICE_ENV")
 	if orderProcessEnv == "" {
@@ -71,6 +89,7 @@ func (env *Env) InitEnv() *Env {
 	// Populate the environment
 	env.RedisConfig = *redisCfgs.Env[orderProcessEnv]
 	env.LogConfig = *logCfgs.Env[orderProcessEnv]
+	env.ServiceConfig = *serviceCfgs.Env[orderProcessEnv]
 
 	level, err := logrus.ParseLevel(env.LogConfig.Loglevel)
 	if err != nil {
@@ -80,6 +99,7 @@ func (env *Env) InitEnv() *Env {
 
 	logrus.Debugf("Redis configuration loaded: %v", env.RedisConfig)
 	logrus.Debugf("Log configuration loaded: %v", env.LogConfig)
+	logrus.Debugf("Service configuration loaded: %v", env.ServiceConfig)
 
 	// If no local configuration found, we should qurey the Discovery Service.
 	return env

@@ -6,11 +6,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"order_process/process/consumer"
+	"order_process/process/env"
 	"order_process/process/handlers"
+	"order_process/process/model/cluster"
 	"order_process/process/model/order"
 	"order_process/process/model/pipeline"
 	"order_process/process/model/transfer"
 	"order_process/process/util"
+	"strconv"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
@@ -25,15 +28,19 @@ var (
 type OrderProcessService struct {
 	ServiceID       string
 	PipelineManager pipeline.IPipelineManager
+	Port            int
+	Cluster         cluster.ICluster
 }
 
 // The constructor of Order Processing Service
-func NewOrderProcessService() *OrderProcessService {
+func NewOrderProcessService(serviceCfg *env.ServiceCfg) *OrderProcessService {
 	service := OrderProcessService{
 		ServiceID: util.NewUUID(),
 		PipelineManager: pipeline.NewProcessPipelineManager(MaxPipelineCount,
 			pipeline.NewProcessPipeline, pipeline.NewStepTaskHandler),
+		Port: serviceCfg.Port,
 	}
+	service.Cluster = cluster.New(service.ServiceID)
 	return &service
 }
 
@@ -136,7 +143,7 @@ func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request
 
 	if tranferredServiceId, ok := t["service_id"].(string); ok {
 		// transfer the orders to current service
-		go transfer.Transfer(tranferredServiceId, this.PipelineManager)
+		go transfer.Transfer(this.ServiceID, tranferredServiceId, this.PipelineManager)
 
 		// Generate response
 		response := map[string]string{
@@ -160,6 +167,10 @@ func (this *OrderProcessService) GetServiceID() string {
 
 // Start Service
 func (this *OrderProcessService) Start() (err error) {
+	// Register service
+	this.Cluster.Register(this.GetServiceID())
+
+	// Start pipeline
 	this.PipelineManager.Start()
 
 	r := mux.NewRouter()
@@ -183,7 +194,7 @@ func (this *OrderProcessService) Start() (err error) {
 
 	// Initilize Server
 	server := http.Server{
-		Addr:    "127.0.0.1:8080",
+		Addr:    ":" + strconv.Itoa(this.Port),
 		Handler: r,
 	}
 	// Start Server

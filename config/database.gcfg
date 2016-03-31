@@ -1,5 +1,5 @@
 ; Redis config
 
 [env "dev"]
-host = 192.168.163.149
+host = 127.0.0.1
 port = 6379
