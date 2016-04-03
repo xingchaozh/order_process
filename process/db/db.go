@@ -1,8 +1,6 @@
 package db
 
 import (
-	"order_process/process/util"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/alphazero/Go-Redis"
 )
@@ -37,11 +35,7 @@ func InitDatabase(addr string, port int) error {
 func Write(stmt string, args ...interface{}) error {
 	key := args[0].(string)
 	hashkey := args[1].(string)
-	err := util.ValidateUUID(hashkey)
-	if err != nil {
-		return err
-	}
-	err = redisDB.client.Hset(key, hashkey, []byte(stmt))
+	err := redisDB.client.Hset(key, hashkey, []byte(stmt))
 	if err != nil {
 		return err
 	}
@@ -52,10 +46,6 @@ func Write(stmt string, args ...interface{}) error {
 func Read(stmt string, recordMap map[string]interface{}, args ...interface{}) error {
 	key := args[0].(string)
 	hashkey := args[1].(string)
-	err := util.ValidateUUID(hashkey)
-	if err != nil {
-		return err
-	}
 	result, err := redisDB.client.Hget(key, hashkey)
 	if err != nil {
 		logrus.Error(err)

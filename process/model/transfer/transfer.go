@@ -10,7 +10,7 @@ import (
 // Transfer orders to current service
 func Transfer(currentServiceId string, tranferredServiceId string, pipelineManager pipeline.IPipelineManager) error {
 	// Retrieve the orders from the transferred servive
-	rawMaps, _ := db.Query("", "ServiceOrderMap:"+tranferredServiceId)
+	rawMaps, _ := db.Query("", order.OrderStateInServiceTable+":"+tranferredServiceId)
 
 	// Parse orders
 	var ordersMap []map[string]interface{}
@@ -27,7 +27,7 @@ func Transfer(currentServiceId string, tranferredServiceId string, pipelineManag
 
 	// Loop the orders
 	for _, orderMap := range ordersMap {
-		if orderMap["order_state_in_service"].(string) == "Active" {
+		if orderMap["order_state_in_service"].(string) == order.OSS_Active.String() {
 			record, err := order.Get(orderMap["order_id"].(string))
 			if err != nil {
 				return err
@@ -35,8 +35,8 @@ func Transfer(currentServiceId string, tranferredServiceId string, pipelineManag
 
 			// Update the service order map
 			// cluster.ServiceID
-			order.UpdateOrderStateInService(tranferredServiceId, record.OrderID, "Transferred")
-			order.UpdateOrderStateInService(currentServiceId, record.OrderID, "Active")
+			order.UpdateOrderStateInService(tranferredServiceId, record.OrderID, order.OSS_Transferred.String())
+			order.UpdateOrderStateInService(currentServiceId, record.OrderID, order.OSS_Active.String())
 			record.ServiceID = currentServiceId
 
 			// Dispatch the the retrieved order to pipeline manager

@@ -28,7 +28,7 @@ var (
 type OrderProcessService struct {
 	ServiceID       string
 	PipelineManager pipeline.IPipelineManager
-	Port            int
+	Addr            string
 	Cluster         cluster.ICluster
 }
 
@@ -38,36 +38,29 @@ func NewOrderProcessService(serviceCfg *env.ServiceCfg) *OrderProcessService {
 		ServiceID: util.NewUUID(),
 		PipelineManager: pipeline.NewProcessPipelineManager(MaxPipelineCount,
 			pipeline.NewProcessPipeline, pipeline.NewStepTaskHandler),
-		Port: serviceCfg.Port,
+		Addr: serviceCfg.IP + ":" + strconv.Itoa(serviceCfg.Port),
 	}
-	service.Cluster = cluster.New(service.ServiceID)
+	service.Cluster = cluster.New(service.ServiceID, service.Addr)
 	return &service
 }
 
 // POST /orders
 func (this *OrderProcessService) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// Retrieve user information
-	token := r.Header.Get("Authorization")
-	tokenInfo, err := consumer.GetTokenInfo(token)
-	if err != nil || tokenInfo.UserID == "" {
+	tokenInfo, err := this.RetrieveToken(r)
+	if err != nil {
 		w.WriteHeader(401)
 		return
 	}
 
 	// Parse request body
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	t := make(map[string]interface{})
-	err = json.Unmarshal([]byte(body), &t)
+	t, err := this.ParseRequestBody(r)
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
 	}
 
-	logrus.Debugf("POST /orders RequestBody: [%v]", t)
+	logrus.Debug("POST /orders")
 
 	// Generate order record
 	t["user_id"] = tokenInfo.UserID
@@ -91,9 +84,8 @@ func (this *OrderProcessService) CreateOrder(w http.ResponseWriter, r *http.Requ
 
 // GET /orders/{order_id}
 func (this *OrderProcessService) QureyOrder(w http.ResponseWriter, r *http.Request) {
-	token := r.Header.Get("Authorization")
-	tokenInfo, err := consumer.GetTokenInfo(token)
-	if err != nil || tokenInfo.UserID == "" {
+	tokenInfo, err := this.RetrieveToken(r)
+	if err != nil {
 		w.WriteHeader(401)
 		return
 	}
@@ -119,21 +111,14 @@ func (this *OrderProcessService) QureyOrder(w http.ResponseWriter, r *http.Reque
 // POST /service/transfer
 func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request) {
 	// Retrieve user information
-	token := r.Header.Get("Authorization")
-	tokenInfo, err := consumer.GetTokenInfo(token)
-	if err != nil || tokenInfo.UserID == "" {
+	_, err := this.RetrieveToken(r)
+	if err != nil {
 		w.WriteHeader(401)
 		return
 	}
 
 	// Parse request body
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		fmt.Fprint(w, err)
-		return
-	}
-	t := make(map[string]interface{})
-	err = json.Unmarshal([]byte(body), &t)
+	t, err := this.ParseRequestBody(r)
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
@@ -160,6 +145,56 @@ func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// POST /diagnostic/register
+func (this *OrderProcessService) RegisterService(w http.ResponseWriter, r *http.Request) {
+	// Retrieve user information
+	_, err := this.RetrieveToken(r)
+	if err != nil {
+		w.WriteHeader(401)
+		return
+	}
+
+	// Parse request body
+	t, err := this.ParseRequestBody(r)
+	if err != nil {
+		fmt.Fprint(w, err)
+		return
+	}
+
+	logrus.Debugf("POST /service/transfer RequestBody: [%v]", t)
+
+	if _, ok := t["service_id"].(string); ok {
+		this.Cluster.Register(t["service_id"].(string), t["service_addr"].(string))
+	} else {
+		w.WriteHeader(400)
+		fmt.Fprint(w, "Invalid json format")
+	}
+}
+
+func (this *OrderProcessService) RetrieveToken(r *http.Request) (*consumer.ConsumerInfo, error) {
+	token := r.Header.Get("Authorization")
+	tokenInfo, err := consumer.GetTokenInfo(token)
+	if err != nil {
+		return nil, err
+	}
+	return tokenInfo, nil
+}
+
+func (this *OrderProcessService) ParseRequestBody(r *http.Request) (map[string]interface{}, error) {
+	// Parse request body
+	defer r.Body.Close()
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+	t := make(map[string]interface{})
+	err = json.Unmarshal([]byte(body), &t)
+	if err != nil {
+		return nil, err
+	}
+	return t, nil
+}
+
 // Get current service id
 func (this *OrderProcessService) GetServiceID() string {
 	return this.ServiceID
@@ -167,8 +202,8 @@ func (this *OrderProcessService) GetServiceID() string {
 
 // Start Service
 func (this *OrderProcessService) Start() (err error) {
-	// Register service
-	this.Cluster.Register(this.GetServiceID())
+	// Start Cluster Management
+	this.Cluster.Start()
 
 	// Start pipeline
 	this.PipelineManager.Start()
@@ -176,7 +211,8 @@ func (this *OrderProcessService) Start() (err error) {
 	r := mux.NewRouter()
 
 	// Heartbeat
-	r.HandleFunc("/diagnostic/heartbeat", handlers.NewHeartBeat(this.ServiceID).HeartBeatHandler).Methods("GET")
+	r.HandleFunc("/diagnostic/heartbeat", handlers.NewHeartBeat(this.ServiceID, this.Cluster).HeartBeatHandler).Methods("GET")
+	r.HandleFunc("/diagnostic/register", this.RegisterService).Methods("POST")
 
 	// Create order
 	r.HandleFunc("/orders", this.CreateOrder).Methods("POST")
@@ -194,9 +230,10 @@ func (this *OrderProcessService) Start() (err error) {
 
 	// Initilize Server
 	server := http.Server{
-		Addr:    ":" + strconv.Itoa(this.Port),
+		Addr:    this.Addr,
 		Handler: r,
 	}
+	logrus.Debugf("Service starts to listen on: [%v]", this.Addr)
 	// Start Server
 	return server.ListenAndServe()
 }

@@ -19,31 +19,75 @@ type IPipeline interface {
 	Stop()
 }
 
-var ProcessSteps = []string{
-	"Scheduling",
-	"Pre-Processing",
-	"Processing",
-	"Post-Processing",
-	"Completed",
-	"Failed",
+type ProcessStep int
+
+const (
+	Scheduling ProcessStep = iota
+	PreProcessing
+	Processing
+	PostProcessing
+	Completed
+	Failed
+	Unknown
+)
+
+var ProcessSteps = []ProcessStep{
+	Scheduling,
+	PreProcessing,
+	Processing,
+	PostProcessing,
+	Completed,
+	Failed,
 }
 
-var StepsSwitchMap = map[string][]string{
-	"Scheduling":      {"Scheduling", "Pre-Processing", "Failed"},
-	"Pre-Processing":  {"Pre-Processing", "Processing", "Failed"},
-	"Processing":      {"Processing", "Post-Processing", "Failed"},
-	"Post-Processing": {"Post-Processing", "Completed", "Failed"},
-	"Completed":       {"Completed"},
-	"Failed":          {"Failed"},
+var ProcessStepNames = map[ProcessStep]string{
+	Scheduling:     "Scheduling",
+	PreProcessing:  "Pre-Processing",
+	Processing:     "Processing",
+	PostProcessing: "Post-Processing",
+	Completed:      "Completed",
+	Failed:         "Failed",
 }
 
-var StepsSwitchNextMap = map[string][]string{
-	"Scheduling":      {"Pre-Processing", "Failed"},
-	"Pre-Processing":  {"Processing", "Failed"},
-	"Processing":      {"Post-Processing", "Failed"},
-	"Post-Processing": {"Completed", "Failed"},
-	"Completed":       {"Completed"},
-	"Failed":          {"Failed"},
+func (s ProcessStep) String() string {
+	return ProcessStepNames[s]
+}
+
+func ParseProcessStep(step string) ProcessStep {
+	if step == Scheduling.String() {
+		return Scheduling
+	} else if step == PreProcessing.String() {
+		return PreProcessing
+	} else if step == Processing.String() {
+		return Processing
+	} else if step == PostProcessing.String() {
+		return PostProcessing
+	} else if step == Completed.String() {
+		return Completed
+	} else if step == Failed.String() {
+		return Failed
+	} else {
+		logrus.Error("Parse ProcessStep failed")
+		return Unknown
+	}
+}
+
+var StepsSwitchMap = map[ProcessStep][]ProcessStep{
+	Scheduling:     {Scheduling, PreProcessing, Failed},
+	PreProcessing:  {PreProcessing, Processing, Failed},
+	Processing:     {Processing, PostProcessing, Failed},
+	PostProcessing: {PostProcessing, Completed, Failed},
+	Completed:      {Completed},
+	Failed:         {Failed},
+}
+
+var StepsSwitchNextMap = map[ProcessStep][]ProcessStep{
+	Scheduling:     {PreProcessing, Failed},
+	PreProcessing:  {Processing, Failed},
+	Processing:     {PostProcessing, Failed},
+	PostProcessing: {Completed, Failed},
+	Completed:      {Completed},
+	Failed:         {Failed},
 }
 
 const (
@@ -63,8 +107,8 @@ func NewProcessPipeline(NewTaskHandler func(string, IPipeline) ITaskHandler) IPi
 		Jobs:         make(map[string]IJob),
 		TaskHandlers: make(map[string]ITaskHandler),
 	}
-	for _, stepName := range ProcessSteps {
-		pipeline.TaskHandlers[stepName] = NewTaskHandler(stepName, &pipeline)
+	for _, step := range ProcessSteps {
+		pipeline.TaskHandlers[step.String()] = NewTaskHandler(step.String(), &pipeline)
 	}
 	return &pipeline
 }
@@ -129,15 +173,15 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 		return nextRollbackStep, nil
 	}
 
-	if nextSteps, found := StepsSwitchNextMap[job.GetCurrentStep()]; found {
+	if nextSteps, found := StepsSwitchNextMap[ParseProcessStep(job.GetCurrentStep())]; found {
 		if !job.IsJobInFinishingStep() {
 			if !job.IsErrorOccured() {
-				return nextSteps[0], nil
+				return nextSteps[0].String(), nil
 			} else {
-				return nextSteps[1], nil
+				return nextSteps[1].String(), nil
 			}
 		}
-		return nextSteps[0], nil
+		return nextSteps[0].String(), nil
 	}
 
 	return "", errors.New("cannot find next step")
@@ -166,8 +210,8 @@ func (this *ProcessPipeline) Stop() {
 
 // Verify whether the step switch is valid
 func VerifyStepSwitch(previousStep string, currentStep string) error {
-	for _, step := range StepsSwitchMap[previousStep] {
-		if step == currentStep {
+	for _, step := range StepsSwitchMap[ParseProcessStep(previousStep)] {
+		if step.String() == currentStep {
 			return nil
 		}
 	}

@@ -4,17 +4,21 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"order_process/process/model/cluster"
 )
 
 // The definition of heart beat check
 type HeartBeat struct {
 	ServiceID string
+	Cluster   cluster.ICluster
 }
 
 // The constructor of heart beat check
-func NewHeartBeat(serviceID string) *HeartBeat {
+func NewHeartBeat(serviceID string, cluster cluster.ICluster) *HeartBeat {
 	return &HeartBeat{
 		ServiceID: serviceID,
+		Cluster:   cluster,
 	}
 }
 

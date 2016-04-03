@@ -60,7 +60,7 @@ func NewProcessJob(rec *order.OrderRecord) *ProcessJob {
 
 // Get the job id
 func (this *ProcessJob) GetJobID() string {
-	return this.record.OrderID
+	return this.JobId
 }
 
 // Get current order step
@@ -80,7 +80,7 @@ func (this *ProcessJob) IsJobFinished() bool {
 
 // Check whether order is in final step("Completed" or "Failed")
 func (this *ProcessJob) IsJobInFinishingStep() bool {
-	return this.record.CurrentStep == "Completed" || this.record.CurrentStep == "Failed"
+	return this.record.CurrentStep == Completed.String() || this.record.CurrentStep == Failed.String()
 }
 
 // To map format
@@ -155,16 +155,16 @@ func (this *ProcessJob) MarkJobAsFailure() {
 
 // Trigger the rollback process
 func (this *ProcessJob) StartRollback() {
-	this.record.RollbackState = "triggered"
+	this.record.RollbackState = order.Triggerred.String()
 }
 
 // Check whether job is rollbacking.
 func (this *ProcessJob) IsJobRollbacking() bool {
-	if this.record.RollbackState == "triggered" {
+	if this.record.RollbackState == order.Triggerred.String() {
 		index := len(this.record.Steps) - 1
 		for ; index >= 0; index-- {
-			if this.record.Steps[index].StepName != "Completed" &&
-				this.record.Steps[index].StepName != "Failed" &&
+			if this.record.Steps[index].StepName != Completed.String() &&
+				this.record.Steps[index].StepName != Failed.String() &&
 				!this.record.Steps[index].StepRollbacked {
 				break
 			}
@@ -178,8 +178,8 @@ func (this *ProcessJob) IsJobRollbacking() bool {
 func (this *ProcessJob) GetRollbackStep() (string, error) {
 	index := len(this.record.Steps) - 1
 	for ; index >= 0; index-- {
-		if this.record.Steps[index].StepName != "Completed" &&
-			this.record.Steps[index].StepName != "Failed" &&
+		if this.record.Steps[index].StepName != Completed.String() &&
+			this.record.Steps[index].StepName != Failed.String() &&
 			!this.record.Steps[index].StepRollbacked {
 			break
 		}
@@ -206,9 +206,9 @@ func (this *ProcessJob) RollbackStep(stepName string) {
 
 // Update current job data to database
 func (this *ProcessJob) UpdateDatabase() {
-	orderStateInService := "Active"
+	orderStateInService := order.OSS_Active.String()
 	if this.IsJobFinished() && !this.IsJobRollbacking() {
-		orderStateInService = "Completed"
+		orderStateInService = order.OSS_Completed.String()
 	}
 	this.record.SaveToDB(orderStateInService)
 }

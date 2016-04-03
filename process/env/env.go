@@ -28,7 +28,8 @@ type LogCfg struct {
 
 // The definition of service configuration
 type ServiceCfg struct {
-	Port int `json:"port"`
+	IP   string `json:"ip"`
+	Port int    `json:"port"`
 }
 
 // The definition of service environment

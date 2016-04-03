@@ -31,6 +31,47 @@ type OrderStep struct {
 	StepRollbacked bool   `json:"step_rollbacked"`
 }
 
+// The definition of RollbackState
+type RollbackState int
+
+const (
+	Triggerred RollbackState = iota
+	UnTriggerred
+)
+
+var RollbackStateNames = map[RollbackState]string{
+	Triggerred:   "triggerred",
+	UnTriggerred: "untriggerred",
+}
+
+func (s RollbackState) String() string {
+	return RollbackStateNames[s]
+}
+
+// The definition of OrderStateInService
+type OrderStateInService int
+
+const (
+	OSS_Active OrderStateInService = iota
+	OSS_Completed
+	OSS_Transferred
+)
+
+var OrderStateInServiceNames = map[OrderStateInService]string{
+	OSS_Active:      "active",
+	OSS_Completed:   "completed",
+	OSS_Transferred: "transferred",
+}
+
+const (
+	OrderTableName           = "Orders"
+	OrderStateInServiceTable = "OrderStateInService"
+)
+
+func (s OrderStateInService) String() string {
+	return OrderStateInServiceNames[s]
+}
+
 // New order record
 func New(record map[string]interface{}) (*OrderRecord, error) {
 	id := util.NewUUID()
@@ -49,14 +90,14 @@ func New(record map[string]interface{}) (*OrderRecord, error) {
 	record["steps"] = steps
 	record["finished"] = false
 	record["failure_occured"] = false
-	record["rollback_state"] = "NA"
+	record["rollback_state"] = UnTriggerred.String()
 
 	orderRecord, err := GenerateOrderRecord(record)
 	if err != nil {
 		return nil, err
 	}
 
-	err = orderRecord.SaveToDB("Active")
+	err = orderRecord.SaveToDB(OSS_Active.String())
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +258,7 @@ func (this *OrderRecord) ToMapForUser() *map[string]interface{} {
 // Save current order data to database
 func (this *OrderRecord) SaveToDB(orderStateInService string) error {
 	str, err := this.ToJson()
-	err = db.Write(str, "Orders", this.OrderID)
+	err = db.Write(str, OrderTableName, this.OrderID)
 	if err != nil {
 		return err
 	}
@@ -232,7 +273,7 @@ func UpdateOrderStateInService(serviceID string, orderId string, orderStateInSer
 		"order_state_in_service": orderStateInService,
 	}
 	regInfoJson, _ := json.Marshal(regInfo)
-	err := db.Write(string(regInfoJson), "ServiceOrderMap:"+serviceID, orderId)
+	err := db.Write(string(regInfoJson), OrderStateInServiceTable+":"+serviceID, orderId)
 	if err != nil {
 		return err
 	}
@@ -242,7 +283,7 @@ func UpdateOrderStateInService(serviceID string, orderId string, orderStateInSer
 // Read from Database
 func ReadFromDB(orderID string) (map[string]interface{}, error) {
 	recordMap := make(map[string]interface{})
-	err := db.Read("", recordMap, "Orders", orderID)
+	err := db.Read("", recordMap, OrderTableName, orderID)
 	if err != nil {
 		return nil, err
 	}
