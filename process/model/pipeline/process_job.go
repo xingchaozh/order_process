@@ -11,17 +11,24 @@ type IJob interface {
 	// Job ID
 	GetJobID() string
 
+	// Service ID
+	GetServiceID() string
+	SetServiceID(string)
+
 	// Step status
 	GetCurrentStep() string
 	IsCurrentStepCompleted() bool
 
 	// Step
 	StartStep(stepName string) error
-	FinishCurrentStep()
+	FinishCurrentStep() error
 
 	// Job status
 	IsJobInFinishingStep() bool
 	IsJobFinished() bool
+
+	// state in service
+	GetJobStateInService(serviceID string) (string, error)
 
 	// Failure
 	IsErrorOccured() bool
@@ -31,10 +38,10 @@ type IJob interface {
 	StartRollback()
 	IsJobRollbacking() bool
 	GetRollbackStep() (string, error)
-	RollbackStep(stepName string)
+	RollbackStep(stepName string) error
 
 	// Save to database
-	UpdateDatabase()
+	UpdateDatabase() error
 
 	// Finalize
 	FinalizeJob() error
@@ -46,21 +53,28 @@ type IJob interface {
 
 // The defination of Order Processing Job
 type ProcessJob struct {
-	record *order.OrderRecord
-	JobId  string
+	record    *order.OrderRecord
+	JobId     string
+	ServiceId string
 }
 
 // The construtor of Order Processing Job
 func NewProcessJob(rec *order.OrderRecord) *ProcessJob {
 	return &ProcessJob{
-		record: rec,
-		JobId:  rec.OrderID,
+		record:    rec,
+		JobId:     rec.OrderID,
+		ServiceId: rec.ServiceID,
 	}
 }
 
 // Get the job id
 func (this *ProcessJob) GetJobID() string {
 	return this.JobId
+}
+
+// Get the service id
+func (this *ProcessJob) GetServiceID() string {
+	return this.ServiceId
 }
 
 // Get current order step
@@ -100,7 +114,8 @@ func (this *ProcessJob) ToJson() string {
 // Start specified step
 func (this *ProcessJob) StartStep(stepName string) error {
 	if this.GetCurrentStep() == stepName {
-		return errors.New("The step has started")
+		// The step has started
+		return nil
 	}
 
 	if !this.IsCurrentStepCompleted() && !this.IsErrorOccured() {
@@ -114,12 +129,11 @@ func (this *ProcessJob) StartStep(stepName string) error {
 	this.record.CurrentStep = orderStep.StepName
 	this.record.Steps = append(this.record.Steps, orderStep)
 
-	this.UpdateDatabase()
-	return nil
+	return this.UpdateDatabase()
 }
 
 //Finish the Current Step
-func (this *ProcessJob) FinishCurrentStep() {
+func (this *ProcessJob) FinishCurrentStep() error {
 	step := &this.record.Steps[len(this.record.Steps)-1]
 	step.StepCompleted = true
 	step.CompleteTime = time.Now().UTC().String()
@@ -128,7 +142,7 @@ func (this *ProcessJob) FinishCurrentStep() {
 		this.record.CompleteTime = step.CompleteTime
 		this.record.Finished = true
 	}
-	this.UpdateDatabase()
+	return this.UpdateDatabase()
 }
 
 // Finalize job
@@ -137,8 +151,7 @@ func (this *ProcessJob) FinalizeJob() error {
 		this.record.CompleteTime = time.Now().UTC().String()
 		this.record.Finished = true
 
-		this.UpdateDatabase()
-		return nil
+		return this.UpdateDatabase()
 	}
 	return errors.New("Job not ready to be finished")
 }
@@ -192,7 +205,7 @@ func (this *ProcessJob) GetRollbackStep() (string, error) {
 }
 
 // Perform the rollback of specified step
-func (this *ProcessJob) RollbackStep(stepName string) {
+func (this *ProcessJob) RollbackStep(stepName string) error {
 	index := len(this.record.Steps) - 1
 	for ; index >= 0; index-- {
 		if this.record.Steps[index].StepName == stepName &&
@@ -201,14 +214,23 @@ func (this *ProcessJob) RollbackStep(stepName string) {
 			break
 		}
 	}
-	this.UpdateDatabase()
+	return this.UpdateDatabase()
 }
 
 // Update current job data to database
-func (this *ProcessJob) UpdateDatabase() {
+func (this *ProcessJob) UpdateDatabase() error {
 	orderStateInService := order.OSS_Active.String()
 	if this.IsJobFinished() && !this.IsJobRollbacking() {
 		orderStateInService = order.OSS_Completed.String()
 	}
-	this.record.SaveToDB(orderStateInService)
+	return this.record.SaveToDB(orderStateInService)
+}
+
+func (this *ProcessJob) GetJobStateInService(serviceID string) (string, error) {
+	return this.record.GetOrderStateInService(serviceID)
+}
+
+func (this *ProcessJob) SetServiceID(serviceId string) {
+	this.ServiceId = serviceId
+	this.record.ServiceID = serviceId
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"order_process/process/db"
 	"order_process/process/env"
+	"order_process/process/service"
 	"os"
 
 	"github.com/Sirupsen/logrus"
@@ -42,7 +43,7 @@ func main() {
 	}
 
 	// Create OrderProcessService instance and start.
-	service := NewOrderProcessService(&env.ServiceConfig)
+	service := service.NewOrderProcessService(&env.ServiceConfig)
 	err = service.Start(join)
 	if err != nil {
 		logrus.Fatal(err)

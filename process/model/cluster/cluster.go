@@ -3,6 +3,7 @@ package cluster
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -23,6 +24,10 @@ type ICluster interface {
 	TermChangeEventHandler(raft.Event)
 
 	RegisterService(io.ReadCloser) error
+	IsCurrentServiceLeader() bool
+	GetLeaderConnectionString() (string, error)
+
+	DescribeState() (string, error)
 }
 
 // The definition of Cluster
@@ -101,11 +106,6 @@ func (this *Cluster) Start(leader string) {
 	} else {
 		logrus.Println("Recovered from log")
 	}
-
-	// Discovery leader Service
-	leaderName := this.raftServer.Leader()
-	logrus.Println(leaderName)
-	logrus.Println(this.raftServer.Peers())
 }
 
 // Returns the connection string.
@@ -124,10 +124,19 @@ func (this *Cluster) Join(leader string) error {
 	json.NewEncoder(&b).Encode(command)
 	resp, err := http.Post(fmt.Sprintf("http://%s/cluster/join", leader), "application/json", &b)
 	if err != nil {
+		logrus.Error(err)
 		return err
 	}
-	resp.Body.Close()
 
+	if resp.StatusCode == http.StatusTemporaryRedirect {
+		logrus.Debugf("Redirect to %s", resp.Header.Get("Location"))
+		var body bytes.Buffer
+		json.NewEncoder(&body).Encode(command)
+		_, err := http.Post(resp.Header.Get("Location"), "application/json", &body)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -188,7 +197,6 @@ func (this *Cluster) CheckPeersStatus() {
 			this.raftServer.MemberCount(), len(this.raftServer.Peers()))
 
 		for _, peer := range this.raftServer.Peers() {
-			logrus.Debugf("Peer [%v]", peer)
 			if this.IsPeerOffline(peer) {
 				// Become OFFLINE
 				if connected, ok := this.peers[peer.Name]; !ok || connected {
@@ -198,6 +206,7 @@ func (this *Cluster) CheckPeersStatus() {
 			} else {
 				this.peers[peer.Name] = true
 			}
+			logrus.Debugf("[%v]Peer [%v]", this.peers[peer.Name], peer)
 
 			if !this.IsCurrentServiceLeader() {
 				return
@@ -206,6 +215,7 @@ func (this *Cluster) CheckPeersStatus() {
 	}
 }
 
+// Check whether peer is offline
 func (this *Cluster) IsPeerOffline(peer *raft.Peer) bool {
 	elapsedTime := time.Now().Sub(peer.LastActivity())
 	if elapsedTime > time.Duration(float64(raft.DefaultHeartbeatInterval)*MaxHeartbeatFailTimes) {
@@ -214,12 +224,17 @@ func (this *Cluster) IsPeerOffline(peer *raft.Peer) bool {
 	return false
 }
 
+// Check whether current service is leader
 func (this *Cluster) IsCurrentServiceLeader() bool {
 	return this.raftServer.State() == raft.Leader // this.raftServer.Name() == this.raftServer.Leader()
 }
 
 // Transfer the orders of one offline service
 func (this *Cluster) TransferOrders(serviceId string) {
+	if serviceId == this.serviceID {
+		logrus.Fatal("Cannot tranfer self orders when alive")
+	}
+
 	transfer := func(connectionString string, client *http.Client) bool {
 		data := map[string]string{
 			"service_id": serviceId,
@@ -242,16 +257,66 @@ func (this *Cluster) TransferOrders(serviceId string) {
 		// Select one online service and transfer the pending orders
 		for _, peer := range this.raftServer.Peers() {
 			if !this.IsPeerOffline(peer) {
+				if peer.Name == serviceId {
+					logrus.Debug("Abort tranfer orders when service recovery")
+					transferred = true
+					break
+				}
 				transferred = transfer(peer.ConnectionString, client)
 				if transferred {
 					break
 				}
 			}
 		}
-		transferred = transfer(this.connectionString(), client)
-		if transferred {
-			break
+
+		if !transferred {
+			transferred = transfer(this.connectionString(), client)
 		}
-		time.Sleep(time.Second) // Retry later
 	}
+}
+
+// Return of connection string of raft cluster leader
+func (this *Cluster) GetLeaderConnectionString() (string, error) {
+	if this.IsCurrentServiceLeader() {
+		return this.connectionString(), nil
+	}
+
+	if peer, ok := this.raftServer.Peers()[this.raftServer.Leader()]; ok {
+		return peer.ConnectionString, nil
+	}
+	return "", errors.New("Retrieve leader connection string failed")
+}
+
+// Describe the cluster state
+func (this *Cluster) DescribeState() (string, error) {
+	nodesMap := []map[string]interface{}{}
+
+	generatePeerInfo := func(name string, connStr string, last time.Time, connected bool) map[string]interface{} {
+		return map[string]interface{}{
+			"name":              name,
+			"connection_string": connStr,
+			"last_activity":     last,
+			"connected":         connected,
+		}
+	}
+
+	for _, peer := range this.raftServer.Peers() {
+		nodesMap = append(nodesMap, generatePeerInfo(peer.Name,
+			peer.ConnectionString, peer.LastActivity(), !this.IsPeerOffline(peer)))
+	}
+
+	nodesMap = append(nodesMap, generatePeerInfo(this.raftServer.Name(),
+		this.connectionString(), time.Now(), true))
+
+	statusMap := map[string]interface{}{
+		"leader_name": this.raftServer.Leader(),
+		"nodes_count": this.raftServer.MemberCount(),
+		"nodes":       nodesMap,
+	}
+
+	str, err := json.Marshal(&statusMap)
+	if err != nil {
+		return "", err
+	}
+	return string(str), nil
 }

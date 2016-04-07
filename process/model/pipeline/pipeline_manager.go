@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"order_process/process/model/order"
+	"order_process/process/model/transfer"
 )
 
 // The interface of Pipleline Manager
@@ -18,12 +19,15 @@ type IPipelineManager interface {
 type ProcessPipelineManager struct {
 	pipelines                 []IPipeline
 	lastPipelineSelectedIndex int
+	serviceID                 string
 }
 
 // The constructor of Order Process Pipeline Manager
-func NewProcessPipelineManager(MaxPipelineCount int, NewPipeline func(func(string, IPipeline) ITaskHandler) IPipeline,
+func NewProcessPipelineManager(serviceID string, MaxPipelineCount int,
+	NewPipeline func(func(string, IPipeline) ITaskHandler) IPipeline,
 	NewTaskHandler func(string, IPipeline) ITaskHandler) *ProcessPipelineManager {
 	pipelineManager := ProcessPipelineManager{
+		serviceID:                 serviceID,
 		lastPipelineSelectedIndex: -1,
 	}
 	for i := 0; i < MaxPipelineCount; i++ {
@@ -43,6 +47,12 @@ func (this *ProcessPipelineManager) Start() {
 	for _, pipeline := range this.pipelines {
 		pipeline.Start()
 	}
+
+	// Load the pending jobs
+	fn := func(orderRecord *order.OrderRecord) {
+		this.DispatchOrder(orderRecord)
+	}
+	transfer.Reload(this.serviceID, this.serviceID, fn)
 }
 
 // Stop the pipeline management and pipelines

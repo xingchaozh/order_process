@@ -3,6 +3,7 @@ package order
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"order_process/process/db"
 	"order_process/process/util"
 	"time"
@@ -92,23 +93,26 @@ func New(record map[string]interface{}) (*OrderRecord, error) {
 	record["failure_occured"] = false
 	record["rollback_state"] = UnTriggerred.String()
 
-	orderRecord, err := GenerateOrderRecord(record)
+	orderRecord, err := generateOrderRecord(record)
 	if err != nil {
 		return nil, err
 	}
 
+	UpdateOrderStateInService(record["service_id"].(string), id, OSS_Active.String())
 	err = orderRecord.SaveToDB(OSS_Active.String())
 	if err != nil {
 		return nil, err
 	}
-
 	return orderRecord, nil
 }
 
 // Generate Order Record according information stored in record map
-func GenerateOrderRecord(record map[string]interface{}) (*OrderRecord, error) {
+func generateOrderRecord(record map[string]interface{}) (*OrderRecord, error) {
 	if record["order_id"] == nil {
 		return nil, errors.New("order_id is required")
+	}
+	if record["service_id"] == nil {
+		return nil, errors.New("service_id is required")
 	}
 	if record["current_step"] == nil {
 		return nil, errors.New("current_step is required")
@@ -221,7 +225,7 @@ func (this *OrderRecord) ToMap() *map[string]interface{} {
 
 // To json file
 func (this *OrderRecord) ToJsonForUser() (string, error) {
-	jsonOrderRecord, err := json.Marshal(this.ToMapForUser())
+	jsonOrderRecord, err := json.Marshal(this.toMapForUser())
 	if err != nil {
 		return "", err
 	}
@@ -229,7 +233,7 @@ func (this *OrderRecord) ToJsonForUser() (string, error) {
 }
 
 // Just used for query
-func (this *OrderRecord) ToMapForUser() *map[string]interface{} {
+func (this *OrderRecord) toMapForUser() *map[string]interface{} {
 	stepsMap := []map[string]interface{}{}
 	for _, step := range this.Steps {
 		stepMap := map[string]interface{}{
@@ -257,12 +261,48 @@ func (this *OrderRecord) ToMapForUser() *map[string]interface{} {
 
 // Save current order data to database
 func (this *OrderRecord) SaveToDB(orderStateInService string) error {
+	state, err := GetOrderStateInService(this.ServiceID, this.OrderID)
+	if err != nil {
+		return err
+	}
+
+	if state != OSS_Active.String() {
+		return errors.New("Cannot update order, because order is not active in current service")
+	}
+
 	str, err := this.ToJson()
 	err = db.Write(str, OrderTableName, this.OrderID)
 	if err != nil {
 		return err
 	}
-	return UpdateOrderStateInService(this.ServiceID, this.OrderID, orderStateInService)
+
+	if orderStateInService != OSS_Active.String() {
+		return UpdateOrderStateInService(this.ServiceID, this.OrderID, orderStateInService)
+	}
+	return nil
+}
+
+func (this *OrderRecord) GetOrderStateInService(serviceID string) (string, error) {
+	return GetOrderStateInService(serviceID, this.OrderID)
+}
+
+func GetOrderStateInService(serviceID string, orderID string) (string, error) {
+	recordMap := make(map[string]interface{})
+	err := db.Read("", recordMap, OrderStateInServiceTable+":"+serviceID, orderID)
+	if err != nil {
+		return "", err
+	}
+
+	t := make(map[string]interface{})
+	err = json.Unmarshal(recordMap[orderID].([]byte), &t)
+	if err != nil {
+		return "", err
+	}
+	if state, ok := t["order_state_in_service"].(string); ok {
+		return state, nil
+	}
+
+	return "", errors.New(fmt.Sprintf("IsOrderActiveInService: error state: [%v]", t))
 }
 
 func UpdateOrderStateInService(serviceID string, orderId string, orderStateInService string) error {
@@ -304,7 +344,7 @@ func Get(orderId string) (*OrderRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	orderRecord, err := GenerateOrderRecord(t)
+	orderRecord, err := generateOrderRecord(t)
 	if err != nil {
 		return nil, err
 	}

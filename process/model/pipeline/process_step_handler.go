@@ -17,7 +17,7 @@ type ITaskHandler interface {
 	PerformTasks()
 
 	// Rollback current task if failure
-	Rollback()
+	Rollback() error
 
 	// Stop the task handler
 	Stop()
@@ -71,38 +71,46 @@ func (this *ProcessStepTaskHandler) PerformTasks() {
 func (this *ProcessStepTaskHandler) HandleCurrentTask() error {
 	logrus.Debugf("[%s]handling step[%s]", this.CurentStepTask.GetJobID(), this.StepTaskType)
 
+	var err error
+
 	if this.CurentStepTask.IsJobRollbacking() && this.StepTaskType != "Failed" {
-		this.Rollback()
+		err = this.Rollback()
 	} else {
-		this.StartStep()
-		// Simulate the processing of current order step
-		if !this.CurentStepTask.IsJobInFinishingStep() {
-			time.Sleep(time.Second * StepProcessTime)
+		err = this.StartStep()
+		if err == nil {
+			// Simulate the processing of current order step
+			if !this.CurentStepTask.IsJobInFinishingStep() {
+				time.Sleep(time.Second * StepProcessTime)
+			}
+
+			// Simulate the processing failure occurs at 5% ratio
+			if util.IsEventWithSpecifiedRatioHappens() && !this.CurentStepTask.IsJobInFinishingStep() {
+				err = errors.New("Random failure")
+			} else {
+				err = this.FinishStep()
+			}
 		}
 
-		// Simulate the processing failure occurs at 5% ratio
-		if util.IsEventWithSpecifiedRatioHappens() && !this.CurentStepTask.IsJobInFinishingStep() {
-			this.CurentStepTask.MarkJobAsFailure()
+	}
 
-			// Trigger roll back
-			this.CurentStepTask.StartRollback()
+	if err != nil {
+		this.CurentStepTask.MarkJobAsFailure()
+		// Trigger roll back
+		this.CurentStepTask.StartRollback()
 
-			logrus.Debugf("[%s]Failure occurs when handling step[%s]",
-				this.CurentStepTask.GetJobID(), this.CurentStepTask.GetCurrentStep())
-		} else {
-			this.FinishStep()
-		}
+		logrus.Debugf("[%s]Failure occurs when handling step[%s][%v]",
+			this.CurentStepTask.GetJobID(), this.CurentStepTask.GetCurrentStep(), err)
 	}
 
 	go this.PipeLine.DispatchTask(this.CurentStepTask.GetJobID())
-	return nil
+	return err
 }
 
 // Handle the rollback operation
-func (this *ProcessStepTaskHandler) Rollback() {
+func (this *ProcessStepTaskHandler) Rollback() error {
 	logrus.Debugf("[%s]Rollback step[%s]", this.CurentStepTask.GetJobID(), this.StepTaskType)
 
-	this.CurentStepTask.RollbackStep(this.StepTaskType)
+	return this.CurentStepTask.RollbackStep(this.StepTaskType)
 }
 
 // Start current step
@@ -113,10 +121,9 @@ func (this *ProcessStepTaskHandler) StartStep() error {
 		return err
 	}
 
-	job.StartStep(this.StepTaskType)
-
+	err = job.StartStep(this.StepTaskType)
 	logrus.Debugf("[%s]Start step[%s]", job.GetJobID(), job.GetCurrentStep())
-	return nil
+	return err
 }
 
 // Finish current step
@@ -126,10 +133,9 @@ func (this *ProcessStepTaskHandler) FinishStep() error {
 		return errors.New("Cannot finish step since it is not current step")
 	}
 
-	job.FinishCurrentStep()
-
+	err := job.FinishCurrentStep()
 	logrus.Debugf("[%s]Finish step[%s]", job.GetJobID(), job.GetCurrentStep())
-	return nil
+	return err
 }
 
 // Stop the task handler

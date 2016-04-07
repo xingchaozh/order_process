@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"order_process/process/consumer"
+	"order_process/process/diagnostic"
 	"order_process/process/env"
 	"order_process/process/model/cluster"
 	"order_process/process/model/order"
@@ -26,15 +27,19 @@ var (
 
 // Order Processing Service
 type OrderProcessService struct {
-	serviceID  string
-	host       string
-	port       int
-	path       string
+	serviceID string
+	host      string
+	port      int
+	path      string
+
+	cluster cluster.ICluster
+
 	router     *mux.Router
 	httpServer *http.Server
 
 	pipelineManager pipeline.IPipelineManager
-	cluster         cluster.ICluster
+
+	diagnostic *diagnostic.Diagnostic
 }
 
 // Creates a new server.
@@ -51,7 +56,7 @@ func NewOrderProcessService(serviceCfg *env.ServiceCfg) *OrderProcessService {
 	if b, err := ioutil.ReadFile(filepath.Join(s.path, "service_id")); err == nil {
 		s.serviceID = string(b)
 	} else {
-		s.serviceID = util.NewUUID() // fmt.Sprintf("%07x", rand.Int())[0:7]
+		s.serviceID = util.NewUUID()
 		if err = ioutil.WriteFile(filepath.Join(s.path, "service_id"), []byte(s.serviceID), 0644); err != nil {
 			panic(err)
 		}
@@ -66,9 +71,12 @@ func (this *OrderProcessService) Start(leader string) error {
 	this.cluster.Start(leader)
 
 	// Initialize and start pipeline
-	this.pipelineManager = pipeline.NewProcessPipelineManager(MaxPipelineCount,
+	this.pipelineManager = pipeline.NewProcessPipelineManager(this.serviceID, MaxPipelineCount,
 		pipeline.NewProcessPipeline, pipeline.NewStepTaskHandler)
 	this.pipelineManager.Start()
+
+	// Initialize the diagnostic
+	this.diagnostic = diagnostic.New(this.serviceID, this.cluster)
 
 	logrus.Println("Initializing HTTP server")
 
@@ -90,6 +98,10 @@ func (this *OrderProcessService) Start(leader string) error {
 	// Transfer orders from specified service
 	this.router.HandleFunc("/service/transfer", this.Transfer).Methods("POST")
 
+	// Diagnostic handlers
+	this.router.HandleFunc("/diagnostic/cluster", this.diagnostic.ClusterStatusHandler).Methods("GET")
+	this.router.HandleFunc("/diagnostic/heartbeat", this.diagnostic.HeartBeatHandler).Methods("GET")
+
 	// Welcome infomation
 	this.router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprint(w, "Welcome to Order Processing System!")
@@ -98,18 +110,29 @@ func (this *OrderProcessService) Start(leader string) error {
 	logrus.Println("Listening at:", fmt.Sprintf("%s:%d", this.host, this.port))
 
 	return this.httpServer.ListenAndServe()
-
 }
 
 // POST /cluster/join
 func (this *OrderProcessService) RegisterService(w http.ResponseWriter, req *http.Request) {
 	logrus.Debug("POST /cluster/join")
-	err := this.cluster.RegisterService(req.Body)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	if this.cluster.IsCurrentServiceLeader() {
+		err := this.cluster.RegisterService(req.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	} else {
+		leader, err := this.cluster.GetLeaderConnectionString()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		logrus.Debugf("POST /cluster/join Redirect to %s", leader+"/cluster/join")
+		http.Redirect(w, req, leader+"/cluster/join", http.StatusTemporaryRedirect)
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 }
 
 // POST /orders
@@ -133,7 +156,10 @@ func (this *OrderProcessService) CreateOrder(w http.ResponseWriter, r *http.Requ
 	// Generate order record
 	t["user_id"] = tokenInfo.UserID
 	t["service_id"] = this.serviceID
-	orderRecord, _ := order.New(t)
+	orderRecord, err := order.New(t)
+	if err != nil {
+		logrus.Errorf("Error when CreateOrder [%v]", err)
+	}
 	logrus.Debugf("New order created with ID: [%v]", orderRecord.OrderID)
 
 	// Create order processing job according to order record and
@@ -194,13 +220,16 @@ func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request
 
 	logrus.Debugf("POST /service/transfer RequestBody: [%v]", t)
 
-	if tranferredServiceId, ok := t["service_id"].(string); ok {
+	if transferredServiceId, ok := t["service_id"].(string); ok {
 		// transfer the orders to current service
-		go transfer.Transfer(this.serviceID, tranferredServiceId, this.pipelineManager)
+		fn := func(orderRecord *order.OrderRecord) {
+			this.pipelineManager.DispatchOrder(orderRecord)
+		}
+		go transfer.Transfer(this.serviceID, transferredServiceId, fn)
 
 		// Generate response
 		response := map[string]string{
-			"tranferred_service_id": tranferredServiceId,
+			"tranferred_service_id": transferredServiceId,
 			"current_service_id":    this.serviceID,
 		}
 		str, _ := json.Marshal(response)

@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	"order_process/process/model/order"
 )
 
 // The inteface of pipeline for Order Processing Service
@@ -133,14 +134,22 @@ func (this *ProcessPipeline) AppendJob(job IJob) {
 		this.Jobs[job.GetJobID()] = job
 	}
 	// Schedule the job immediately
+	logrus.Debugf("Scheduling the job [%v]", job.GetJobID())
 	this.DispatchTask(job.GetJobID())
 }
 
 // Dispatch the task to next task handler
 func (this *ProcessPipeline) DispatchTask(jobId string) {
 	job := this.Jobs[jobId]
+
+	state, e := job.GetJobStateInService(job.GetServiceID())
+	if e == nil && state != order.OSS_Active.String() {
+		this.FinishJob(jobId, state)
+		return
+	}
+
 	if job.IsJobInFinishingStep() && !job.IsJobRollbacking() {
-		this.FinishJob(jobId)
+		this.FinishJob(jobId, order.OSS_Active.String())
 		return
 	}
 
@@ -188,11 +197,12 @@ func (this *ProcessPipeline) GetNextStep(jobId string) (string, error) {
 }
 
 // Finalize the order if no more process is needed.
-func (this *ProcessPipeline) FinishJob(jobId string) {
+func (this *ProcessPipeline) FinishJob(jobId string, stateInService string) {
 	logrus.Debugf("[%s]Finish Order", jobId)
+	if stateInService == order.OSS_Active.String() {
+		this.Jobs[jobId].FinalizeJob()
+	}
 	logrus.Debugln()
-	this.Jobs[jobId].FinalizeJob()
-
 	{
 		defer this.lock.Unlock()
 		this.lock.Lock()

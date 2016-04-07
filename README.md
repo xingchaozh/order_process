@@ -25,7 +25,7 @@ Order Processing System
 
 ### How to join the existed Order Processing Service Cluster?
 
-> ./order_process -join 192.168.1.101:8080
+> ./order_process --join 192.168.1.101:8080
 
         Order Processing Service Start!
         time="2016-04-07T23:45:40+08:00" level=debug msg="Redis configuration loaded: {127.0.0.1 6379}" 
@@ -38,13 +38,6 @@ Order Processing System
         time="2016-04-07T23:45:40+08:00" level=info msg="map[]" 
         time="2016-04-07T23:45:40+08:00" level=info msg="Initializing HTTP server" 
         time="2016-04-07T23:45:40+08:00" level=info msg="Listening at: 192.168.1.101:8082" 
-
-### How to qurey the status of Order Processing Service?
-
-> curl -H "Authorization:user" http://localhost:8080/diagnostic/heartbeat
-
-        {"serive_id":"f3bf183f-76b6-45eb-74d5-a970adfcfa99","status":"OK"}
-
 
 ### How to submit new order?
 
@@ -164,8 +157,42 @@ Order Processing System
             ]
         }
 
-### How to take over the orders from service which is down?
+### What will happen if one service of cluster becomes down?
+
+> The leader of the cluster will select one service to take over the orders from service which is down. If the leader is down, new leader will be elected and it will transfer orders to peer
+
+> The following request will be performed automatically:
 
 > curl -X POST --data "{\"service_id\":\"630c4a80-11bc-447f-7a88-300d860132ae\"}" -H "Authorization:user" http://localhost:8080/service/transfer
 
         {"current_service_id":"9fb58d56-7e7c-4810-6610-5995f5075519","tranferred_service_id":"630c4a80-11bc-447f-7a88-300d860132ae"}
+
+### How to qurey the status of Order Processing Service?
+
+> curl http://localhost:8080/diagnostic/heartbeat
+
+        {"serive_id":"f3bf183f-76b6-45eb-74d5-a970adfcfa99","status":"OK"}
+
+### How to qurey the status of the Cluster?
+
+> curl http://localhost:8080/diagnostic/cluster
+
+        {
+            "leader_name": "bddda060-2c82-41e8-7b42-67ba6c39ba41",
+            "nodes": [
+                {
+                    "connected": true,
+                    "connection_string": "http://192.168.1.104:8080",
+                    "last_activity": "2016-04-08T23:07:55.2893404+08:00",
+                    "name": "fcfe41ec-fc1c-4f24-60ff-b54cd208d7a5"
+                },
+                {
+                    "connected": true,
+                    "connection_string": "http://192.168.1.104:8082",
+                    "last_activity": "2016-04-08T23:07:55.3072126+08:00",
+                    "name": "bddda060-2c82-41e8-7b42-67ba6c39ba41"
+                }
+            ],
+            "nodes_count": 2
+        }
+		
