@@ -5,6 +5,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"gopkg.in/gcfg.v1"
+
+	"order_process/process/util"
 )
 
 // The path of configuration files
@@ -30,6 +32,7 @@ type LogCfg struct {
 type ServiceCfg struct {
 	IP   string `json:"ip"`
 	Port int    `json:"port"`
+	Path string `json:"path"`
 }
 
 // The definition of service environment
@@ -91,6 +94,14 @@ func (env *Env) InitEnv() *Env {
 	env.RedisConfig = *redisCfgs.Env[orderProcessEnv]
 	env.LogConfig = *logCfgs.Env[orderProcessEnv]
 	env.ServiceConfig = *serviceCfgs.Env[orderProcessEnv]
+
+	if env.ServiceConfig.Path == "" {
+		env.ServiceConfig.Path = util.JoinPath(util.GetCurrentDirectory(), "node")
+	}
+	err = util.MakeDir(env.ServiceConfig.Path)
+	if err != nil {
+		logrus.Fatal(err)
+	}
 
 	level, err := logrus.ParseLevel(env.LogConfig.Loglevel)
 	if err != nil {

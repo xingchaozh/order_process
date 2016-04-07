@@ -8,6 +8,37 @@ Order Processing System
 
 > ./order_process
 
+        Order Processing Service Start!
+        time="2016-04-07T23:44:12+08:00" level=debug msg="Redis configuration loaded: {127.0.0.1 6379}" 
+        time="2016-04-07T23:44:12+08:00" level=debug msg="Log configuration loaded: {debug}" 
+        time="2016-04-07T23:44:12+08:00" level=debug msg="Service configuration loaded: {192.168.1.101 8080}" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="Initializing Raft Server" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="[9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45] stateChange initialized -> follower\n" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="Initializing new cluster" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="[9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45] stateChange follower -> leader\n" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="[9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45] leaderChange  -> 9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="Start to perform leader tasks." 
+        time="2016-04-07T23:44:12+08:00" level=info msg=9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45 
+        time="2016-04-07T23:44:12+08:00" level=info msg="map[]" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="Initializing HTTP server" 
+        time="2016-04-07T23:44:12+08:00" level=info msg="Listening at: 192.168.1.101:8080" 
+
+### How to join the existed Order Processing Service Cluster?
+
+> ./order_process -join 192.168.1.101:8080
+
+        Order Processing Service Start!
+        time="2016-04-07T23:45:40+08:00" level=debug msg="Redis configuration loaded: {127.0.0.1 6379}" 
+        time="2016-04-07T23:45:40+08:00" level=debug msg="Log configuration loaded: {debug}" 
+        time="2016-04-07T23:45:40+08:00" level=debug msg="Service configuration loaded: {192.168.1.101 8082}" 
+        time="2016-04-07T23:45:40+08:00" level=info msg="Initializing Raft Server" 
+        time="2016-04-07T23:45:40+08:00" level=info msg="[15c7d264-1b30-4f54-77b3-76cab522f64b] stateChange initialized -> follower\n" 
+        time="2016-04-07T23:45:40+08:00" level=info msg="Attempting to join leader: 192.168.1.101:8080" 
+        time="2016-04-07T23:45:40+08:00" level=info 
+        time="2016-04-07T23:45:40+08:00" level=info msg="map[]" 
+        time="2016-04-07T23:45:40+08:00" level=info msg="Initializing HTTP server" 
+        time="2016-04-07T23:45:40+08:00" level=info msg="Listening at: 192.168.1.101:8082" 
+
 ### How to qurey the status of Order Processing Service?
 
 > curl -H "Authorization:user" http://localhost:8080/diagnostic/heartbeat

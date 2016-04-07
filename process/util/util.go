@@ -3,9 +3,13 @@ package util
 import (
 	"fmt"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/nu7hatch/gouuid"
 )
 
@@ -28,4 +32,21 @@ func ValidateUUID(uuid string) error {
 func IsEventWithSpecifiedRatioHappens() bool {
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	return r.Intn(100/5) == 0
+}
+
+// Get current path of app
+func GetCurrentDirectory() string {
+	dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
+	if err != nil {
+		logrus.Fatal(err)
+	}
+	return strings.Replace(dir, "\\", "/", -1)
+}
+
+func JoinPath(path string, subPath string) string {
+	return filepath.Join(path, subPath)
+}
+
+func MakeDir(path string) error {
+	return os.MkdirAll(path, 0744)
 }
