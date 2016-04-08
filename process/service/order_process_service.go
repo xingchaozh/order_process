@@ -200,8 +200,7 @@ func (this *OrderProcessService) QureyOrder(w http.ResponseWriter, r *http.Reque
 	fmt.Fprint(w, tokenInfo.UserID, str)
 }
 
-// This API allows current service takes over the orders processing
-// from some service which is down.
+// This API allows current service takes over the orders processing from some service which is down.
 // POST /service/transfer
 func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request) {
 	// Retrieve user information

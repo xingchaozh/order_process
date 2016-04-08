@@ -15,6 +15,7 @@ const (
 	LOG_CFG_FILE     = "config/log.gcfg"
 	SERVICE_CFG_FILE = "config/service.gcfg"
 	ServiceName      = "order_process"
+	Version          = "0.1"
 )
 
 // The defination of redis configuration

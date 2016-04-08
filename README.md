@@ -1,6 +1,53 @@
 Order Processing System
 ------
 
+
+### The source file tree of the project
+
+        .
+        ├── config                            // configuration
+        │   ├── database.gcfg
+        │   ├── log.gcfg
+        │   └── service.gcfg
+        ├── main.go                           // The entry of the service
+        ├── process
+        │   ├── consumer
+        │   │   └── consumer.go
+        │   ├── db                            // database
+        │   │   └── db.go
+        │   ├── diagnostic                    // diagnostic
+        │   │   └── diagnostic.go
+        │   ├── env                           // environment
+        │   │   └── env.go
+        │   ├── model                         // the model of service
+        │   │   ├── cluster                   // cluster management
+        │   │   │   └── cluster.go
+        │   │   ├── order                     // order definition
+        │   │   │   └── order.go
+        │   │   ├── pipeline                  // processing logic
+        │   │   │   ├── job.go
+        │   │   │   ├── manager.go
+        │   │   │   ├── pipeline.go
+        │   │   │   └── task_handler.go
+        │   │   └── transfer                  // job transfer
+        │   │       └── transfer.go
+        │   ├── service                       // the controller of the service
+        │   │   └── order_process_service.go
+        │   └── util                          // util
+        │       └── util.go
+        └── README.md
+        
+                └── README.md
+
+
+### How one order will be processed in Order Processing Service?
+
+![image](http://img.blog.csdn.net/20160410212318322 "order prossing system")
+
+### How does one service live in the cluster ?
+
+![image](http://img.blog.csdn.net/20160410213116856 "order prossing system")
+
 ### How to start Order Processing Service?
 > install and start redis database 
 
@@ -9,35 +56,34 @@ Order Processing System
 > ./order_process
 
         Order Processing Service Start!
-        time="2016-04-07T23:44:12+08:00" level=debug msg="Redis configuration loaded: {127.0.0.1 6379}" 
-        time="2016-04-07T23:44:12+08:00" level=debug msg="Log configuration loaded: {debug}" 
-        time="2016-04-07T23:44:12+08:00" level=debug msg="Service configuration loaded: {192.168.1.101 8080}" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="Initializing Raft Server" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="[9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45] stateChange initialized -> follower\n" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="Initializing new cluster" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="[9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45] stateChange follower -> leader\n" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="[9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45] leaderChange  -> 9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="Start to perform leader tasks." 
-        time="2016-04-07T23:44:12+08:00" level=info msg=9fe69c0b-d9a1-4dd9-6186-eec96f3b9b45 
-        time="2016-04-07T23:44:12+08:00" level=info msg="map[]" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="Initializing HTTP server" 
-        time="2016-04-07T23:44:12+08:00" level=info msg="Listening at: 192.168.1.101:8080" 
+        time="2016-04-10T10:42:36+08:00" level=debug msg="Redis configuration loaded: {127.0.0.1 6379}" 
+        time="2016-04-10T10:42:36+08:00" level=debug msg="Log configuration loaded: {debug}" 
+        time="2016-04-10T10:42:36+08:00" level=debug msg="Service configuration loaded: {127.0.0.1 8080}" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="Initializing Raft Server" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="[bc8df584-c5c8-4e5a-6146-261835d06ded] stateChange initialized -> follower\n" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="Recovered from log" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="Initializing HTTP server" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="Listening at: 127.0.0.1:8080" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="[bc8df584-c5c8-4e5a-6146-261835d06ded] stateChange follower -> candidate\n" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="[bc8df584-c5c8-4e5a-6146-261835d06ded] stateChange candidate -> leader\n" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="[bc8df584-c5c8-4e5a-6146-261835d06ded] leaderChange  -> bc8df584-c5c8-4e5a-6146-261835d06ded" 
+        time="2016-04-10T10:42:36+08:00" level=info msg="Start to perform leader tasks."  
 
 ### How to join the existed Order Processing Service Cluster?
 
-> ./order_process --join 192.168.1.101:8080
+> ./order_process --join localhost:8080
 
         Order Processing Service Start!
-        time="2016-04-07T23:45:40+08:00" level=debug msg="Redis configuration loaded: {127.0.0.1 6379}" 
-        time="2016-04-07T23:45:40+08:00" level=debug msg="Log configuration loaded: {debug}" 
-        time="2016-04-07T23:45:40+08:00" level=debug msg="Service configuration loaded: {192.168.1.101 8082}" 
-        time="2016-04-07T23:45:40+08:00" level=info msg="Initializing Raft Server" 
-        time="2016-04-07T23:45:40+08:00" level=info msg="[15c7d264-1b30-4f54-77b3-76cab522f64b] stateChange initialized -> follower\n" 
-        time="2016-04-07T23:45:40+08:00" level=info msg="Attempting to join leader: 192.168.1.101:8080" 
-        time="2016-04-07T23:45:40+08:00" level=info 
-        time="2016-04-07T23:45:40+08:00" level=info msg="map[]" 
-        time="2016-04-07T23:45:40+08:00" level=info msg="Initializing HTTP server" 
-        time="2016-04-07T23:45:40+08:00" level=info msg="Listening at: 192.168.1.101:8082" 
+        time="2016-04-10T10:44:25+08:00" level=debug msg="Redis configuration loaded: {127.0.0.1 6379}"
+        time="2016-04-10T10:44:25+08:00" level=debug msg="Log configuration loaded: {debug}"
+        time="2016-04-10T10:44:25+08:00" level=debug msg="Service configuration loaded: {127.0.0.1 8082}"
+        time="2016-04-10T10:44:25+08:00" level=info msg="Initializing Raft Server"
+        time="2016-04-10T10:44:25+08:00" level=info msg="[bddda060-2c82-41e8-7b42-67ba6c39ba41] stateChange initialized -> follower\n"
+        time="2016-04-10T10:44:25+08:00" level=info msg="Attempting to join leader: 127.0.0.1:8080"
+        time="2016-04-10T10:44:25+08:00" level=info msg="Initializing HTTP server"
+        time="2016-04-10T10:44:25+08:00" level=info msg="Listening at: 127.0.0.1:8082"
+        time="2016-04-10T10:44:25+08:00" level=info msg="[bddda060-2c82-41e8-7b42-67ba6c39ba41] termChange 0 -> 1\n"
+        time="2016-04-10T10:44:25+08:00" level=info msg="[bddda060-2c82-41e8-7b42-67ba6c39ba41] leaderChange  -> bc8df584-c5c8-4e5a-6146-261835d06ded"
 
 ### How to submit new order?
 
@@ -83,7 +129,7 @@ Order Processing System
                 }
             ]
 
-### What will happen if error occurs during processing?
+### What kind of action the System will take when error occurs during processing?
 > The order should be marked as fail and rollback the steps.
 > For example, the following order failed during "Post-Processing" step, all the steps performed before would be revoked.
 
@@ -157,7 +203,7 @@ Order Processing System
             ]
         }
 
-### What will happen if one service of cluster becomes down?
+### What kind of action the System will take when one service of the cluster down?
 
 > The leader of the cluster will select one service to take over the orders from service which is down. If the leader is down, new leader will be elected and it will transfer orders to peer
 
@@ -171,26 +217,33 @@ Order Processing System
 
 > curl http://localhost:8080/diagnostic/heartbeat
 
-        {"serive_id":"f3bf183f-76b6-45eb-74d5-a970adfcfa99","status":"OK"}
-
+        {
+            "generated_at": "2016-04-10 10:37:46.6735819 +0800 CST",
+            "service_id": "bc8df584-c5c8-4e5a-6146-261835d06ded",
+            "service_name": "order_process",
+            "status": "OK",
+            "version": "0.1"
+        }
+		
 ### How to qurey the status of the Cluster?
 
 > curl http://localhost:8080/diagnostic/cluster
 
         {
-            "leader_name": "bddda060-2c82-41e8-7b42-67ba6c39ba41",
+            "generated_at": "2016-04-10 10:48:49.4810078 +0800 CST",
+            "leader_name": "bc8df584-c5c8-4e5a-6146-261835d06ded",
             "nodes": [
                 {
                     "connected": true,
-                    "connection_string": "http://192.168.1.104:8080",
-                    "last_activity": "2016-04-08T23:07:55.2893404+08:00",
-                    "name": "fcfe41ec-fc1c-4f24-60ff-b54cd208d7a5"
+                    "connection_string": "http://127.0.0.1:8082",
+                    "last_activity": "2016-04-10T10:48:49.4349774+08:00",
+                    "name": "bddda060-2c82-41e8-7b42-67ba6c39ba41"
                 },
                 {
                     "connected": true,
-                    "connection_string": "http://192.168.1.104:8082",
-                    "last_activity": "2016-04-08T23:07:55.3072126+08:00",
-                    "name": "bddda060-2c82-41e8-7b42-67ba6c39ba41"
+                    "connection_string": "http://127.0.0.1:8080",
+                    "last_activity": "2016-04-10T10:48:49.4810078+08:00",
+                    "name": "bc8df584-c5c8-4e5a-6146-261835d06ded"
                 }
             ],
             "nodes_count": 2

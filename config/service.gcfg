@@ -1,6 +1,6 @@
 ; Serive config
 
 [env "dev"]
-ip =  10.10.0.114
+ip =  192.168.1.103
 port = 8080
 ; path =

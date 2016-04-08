@@ -4,10 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 
+	"order_process/process/env"
 	"order_process/process/model/cluster"
+)
+
+const (
+	StatusSuccess = "OK"
 )
 
 // The definition of heart beat check
@@ -30,8 +36,11 @@ func (this *Diagnostic) HeartBeatHandler(w http.ResponseWriter, r *http.Request)
 
 	// Generate response
 	response := map[string]string{
-		"serive_id": this.serviceID,
-		"status":    "OK",
+		"service_name": env.ServiceName,
+		"service_id":   this.serviceID,
+		"version":      env.Version,
+		"status":       StatusSuccess,
+		"generated_at": time.Now().String(),
 	}
 
 	str, _ := json.Marshal(response)

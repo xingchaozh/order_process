@@ -63,7 +63,7 @@ func New(serviceId string, host string, port int, path string, router *mux.Route
 func (this *Cluster) Start(leader string) {
 	var err error
 
-	logrus.Printf("Initializing Raft Server: %s", this.path)
+	logrus.Print("Initializing Raft Server")
 
 	// Initialize and start Raft server.
 	transporter := raft.NewHTTPTransporter("/raft", 200*time.Millisecond)
@@ -254,7 +254,8 @@ func (this *Cluster) TransferOrders(serviceId string) {
 	transferred := false
 	client := &http.Client{}
 	for !transferred && this.IsCurrentServiceLeader() {
-		// Select one online service and transfer the pending orders
+		// select one online service and transfer the pending orders
+		// TODO Random select
 		for _, peer := range this.raftServer.Peers() {
 			if !this.IsPeerOffline(peer) {
 				if peer.Name == serviceId {
@@ -309,9 +310,10 @@ func (this *Cluster) DescribeState() (string, error) {
 		this.connectionString(), time.Now(), true))
 
 	statusMap := map[string]interface{}{
-		"leader_name": this.raftServer.Leader(),
-		"nodes_count": this.raftServer.MemberCount(),
-		"nodes":       nodesMap,
+		"leader_name":  this.raftServer.Leader(),
+		"nodes_count":  this.raftServer.MemberCount(),
+		"nodes":        nodesMap,
+		"generated_at": time.Now().String(),
 	}
 
 	str, err := json.Marshal(&statusMap)
