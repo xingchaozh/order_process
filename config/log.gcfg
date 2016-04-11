@@ -1,4 +1,5 @@
 ; Log config
 
 [env "dev"]
-loglevel = debug
+level = debug
+; path= 

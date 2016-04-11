@@ -65,8 +65,8 @@ func (this *Diagnostic) ClusterStatusHandler(w http.ResponseWriter, req *http.Re
 			return
 		}
 
-		logrus.Debugf("POST /diagnostic/cluster Redirect to %s", leader+"/diagnostic/cluster")
-		http.Redirect(w, req, leader+"/diagnostic/cluster", http.StatusTemporaryRedirect)
+		logrus.Debugf("GET /diagnostic/cluster Redirect to %s", leader+"/diagnostic/cluster")
+		http.Redirect(w, req, leader+"/diagnostic/cluster", http.StatusSeeOther)
 		return
 	}
 }

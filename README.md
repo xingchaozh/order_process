@@ -42,11 +42,21 @@ Order Processing System
 
 ### How one order will be processed in Order Processing Service?
 
+> Each order will be dispatched to one pipeline
+
 ![image](http://img.blog.csdn.net/20160410212318322 "order prossing system")
 
-### How does one service live in the cluster ?
+### How does one service live in the cluster?
+
+> One service can be leader or follower.
 
 ![image](http://img.blog.csdn.net/20160410213116856 "order prossing system")
+
+### How to access the services from outside of cluster?
+
+> Use nginx+keepalived or other tools as load balance. 
+
+![image](http://img.blog.csdn.net/20160411232732855 "order prossing system")
 
 ### How to start Order Processing Service?
 > install and start redis database 

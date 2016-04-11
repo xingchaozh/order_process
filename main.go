@@ -29,14 +29,15 @@ func main() {
 
 	fmt.Println("Order Processing Service Start!")
 
-	// Initialize logger
-	logrus.SetOutput(os.Stdout)
-
 	// Initialize environment
-	env := env.New().InitEnv()
+	env, err := env.New().InitEnv()
+	if err != nil {
+		logrus.Fatal(err)
+		return
+	}
 
 	// Initialize database
-	err := db.InitDatabase(env.RedisConfig.Host, env.RedisConfig.Port)
+	err = db.InitDatabase(env.RedisConfig.Host, env.RedisConfig.Port)
 	if err != nil {
 		logrus.Fatal(err)
 		return

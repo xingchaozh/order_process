@@ -7,10 +7,12 @@ import (
 
 // The interface of Pipleline Manager
 type IPipelineManager interface {
+	// Start the pipeline manager
+	Start() error
+
 	// Dispatch orders
 	DispatchOrder(orderRecord *order.OrderRecord)
-	// Start the pipeline manager
-	Start()
+
 	// Stop the pipeline manager
 	Stop()
 }
@@ -36,14 +38,8 @@ func NewProcessPipelineManager(serviceID string, MaxPipelineCount int,
 	return &pipelineManager
 }
 
-// Dispatch order assigned to pipeline manager
-func (this *ProcessPipelineManager) DispatchOrder(orderRecord *order.OrderRecord) {
-	processJob := NewProcessJob(orderRecord)
-	this.SelectPipeline().AppendJob(processJob)
-}
-
 // Start the pipeline management and pipelines
-func (this *ProcessPipelineManager) Start() {
+func (this *ProcessPipelineManager) Start() error {
 	for _, pipeline := range this.pipelines {
 		pipeline.Start()
 	}
@@ -52,7 +48,13 @@ func (this *ProcessPipelineManager) Start() {
 	fn := func(orderRecord *order.OrderRecord) {
 		this.DispatchOrder(orderRecord)
 	}
-	transfer.Reload(this.serviceID, this.serviceID, fn)
+	return transfer.Reload(this.serviceID, this.serviceID, fn)
+}
+
+// Dispatch order assigned to pipeline manager
+func (this *ProcessPipelineManager) DispatchOrder(orderRecord *order.OrderRecord) {
+	processJob := NewProcessJob(orderRecord)
+	this.SelectPipeline().AppendJob(processJob)
 }
 
 // Stop the pipeline management and pipelines

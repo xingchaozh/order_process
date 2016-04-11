@@ -138,19 +138,20 @@ func (this *OrderProcessService) RegisterService(w http.ResponseWriter, req *htt
 // POST /orders
 func (this *OrderProcessService) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	// Retrieve user information
-	tokenInfo, err := this.RetrieveToken(r)
+	tokenInfo, err := this.retrieveToken(r)
 	if err != nil {
 		w.WriteHeader(401)
 		return
 	}
 
 	// Parse request body
-	t, err := this.ParseRequestBody(r)
+	t, err := this.parseRequestBody(r)
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
 	}
 
+	// TODO user Correlation-Id to track the request
 	logrus.Debug("POST /orders")
 
 	// Generate order record
@@ -178,7 +179,7 @@ func (this *OrderProcessService) CreateOrder(w http.ResponseWriter, r *http.Requ
 
 // GET /orders/{order_id}
 func (this *OrderProcessService) QureyOrder(w http.ResponseWriter, r *http.Request) {
-	tokenInfo, err := this.RetrieveToken(r)
+	tokenInfo, err := this.retrieveToken(r)
 	if err != nil {
 		w.WriteHeader(401)
 		return
@@ -204,14 +205,14 @@ func (this *OrderProcessService) QureyOrder(w http.ResponseWriter, r *http.Reque
 // POST /service/transfer
 func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request) {
 	// Retrieve user information
-	_, err := this.RetrieveToken(r)
+	_, err := this.retrieveToken(r)
 	if err != nil {
 		w.WriteHeader(401)
 		return
 	}
 
 	// Parse request body
-	t, err := this.ParseRequestBody(r)
+	t, err := this.parseRequestBody(r)
 	if err != nil {
 		fmt.Fprint(w, err)
 		return
@@ -242,7 +243,7 @@ func (this *OrderProcessService) Transfer(w http.ResponseWriter, r *http.Request
 }
 
 // Get token information
-func (this *OrderProcessService) RetrieveToken(r *http.Request) (*consumer.ConsumerInfo, error) {
+func (this *OrderProcessService) retrieveToken(r *http.Request) (*consumer.ConsumerInfo, error) {
 	token := r.Header.Get("Authorization")
 	tokenInfo, err := consumer.GetTokenInfo(token)
 	if err != nil {
@@ -252,7 +253,7 @@ func (this *OrderProcessService) RetrieveToken(r *http.Request) (*consumer.Consu
 }
 
 // Parse the body information of request
-func (this *OrderProcessService) ParseRequestBody(r *http.Request) (map[string]interface{}, error) {
+func (this *OrderProcessService) parseRequestBody(r *http.Request) (map[string]interface{}, error) {
 	// Parse request body
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)

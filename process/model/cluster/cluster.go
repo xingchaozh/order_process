@@ -17,7 +17,7 @@ import (
 
 // The interface of Cluster
 type ICluster interface {
-	Start(string)
+	Start(string) error
 
 	StateChangeEventHandler(raft.Event)
 	LeaderChangeEventHandler(raft.Event)
@@ -32,13 +32,13 @@ type ICluster interface {
 
 // The definition of Cluster
 type Cluster struct {
-	serviceID  string      `json:"service_id"`
-	host       string      `json:"host"`
-	port       int         `json:"port"`
-	path       string      `json:"path"`
-	router     *mux.Router `json:"mux_router"`
-	raftServer raft.Server `json:"raft_server"`
-	peers      map[string]bool
+	serviceID  string          `json:"service_id"`
+	host       string          `json:"host"`
+	port       int             `json:"port"`
+	path       string          `json:"path"`
+	router     *mux.Router     `json:"mux_router"`
+	raftServer raft.Server     `json:"raft_server"`
+	peers      map[string]bool `json:"peers"`
 }
 
 // The const used to check state of service
@@ -60,7 +60,7 @@ func New(serviceId string, host string, port int, path string, router *mux.Route
 }
 
 // Start the cluster
-func (this *Cluster) Start(leader string) {
+func (this *Cluster) Start(leader string) error {
 	var err error
 
 	logrus.Print("Initializing Raft Server")
@@ -87,7 +87,7 @@ func (this *Cluster) Start(leader string) {
 		if !this.raftServer.IsLogEmpty() {
 			logrus.Fatal("Cannot join with an existing log")
 		}
-		if err := this.Join(leader); err != nil {
+		if err := this.join(leader); err != nil {
 			logrus.Fatal(err)
 		}
 
@@ -106,6 +106,7 @@ func (this *Cluster) Start(leader string) {
 	} else {
 		logrus.Println("Recovered from log")
 	}
+	return err
 }
 
 // Returns the connection string.
@@ -114,7 +115,7 @@ func (this *Cluster) connectionString() string {
 }
 
 // Joins to the leader of an existing cluster.
-func (this *Cluster) Join(leader string) error {
+func (this *Cluster) join(leader string) error {
 	command := &raft.DefaultJoinCommand{
 		Name:             this.raftServer.Name(),
 		ConnectionString: this.connectionString(),
@@ -181,12 +182,12 @@ func (this *Cluster) LeaderChange(e raft.Event) {
 	if this.IsCurrentServiceLeader() {
 		logrus.Println("Start to perform leader tasks.")
 		// Perform task
-		this.CheckPeersStatus()
+		this.checkPeersStatus()
 	}
 }
 
 // Check the services status, update the state if online, or set offline if failure.
-func (this *Cluster) CheckPeersStatus() {
+func (this *Cluster) checkPeersStatus() {
 	ticker := time.NewTicker(time.Second * ClusterStatusCheckInterval)
 	for _ = range ticker.C {
 		if !this.IsCurrentServiceLeader() {
@@ -197,11 +198,11 @@ func (this *Cluster) CheckPeersStatus() {
 			this.raftServer.MemberCount(), len(this.raftServer.Peers()))
 
 		for _, peer := range this.raftServer.Peers() {
-			if this.IsPeerOffline(peer) {
+			if this.isPeerOffline(peer) {
 				// Become OFFLINE
 				if connected, ok := this.peers[peer.Name]; !ok || connected {
 					this.peers[peer.Name] = false
-					go this.TransferOrders(peer.Name)
+					go this.transferOrders(peer.Name)
 				}
 			} else {
 				this.peers[peer.Name] = true
@@ -216,7 +217,7 @@ func (this *Cluster) CheckPeersStatus() {
 }
 
 // Check whether peer is offline
-func (this *Cluster) IsPeerOffline(peer *raft.Peer) bool {
+func (this *Cluster) isPeerOffline(peer *raft.Peer) bool {
 	elapsedTime := time.Now().Sub(peer.LastActivity())
 	if elapsedTime > time.Duration(float64(raft.DefaultHeartbeatInterval)*MaxHeartbeatFailTimes) {
 		return true
@@ -230,7 +231,7 @@ func (this *Cluster) IsCurrentServiceLeader() bool {
 }
 
 // Transfer the orders of one offline service
-func (this *Cluster) TransferOrders(serviceId string) {
+func (this *Cluster) transferOrders(serviceId string) {
 	if serviceId == this.serviceID {
 		logrus.Fatal("Cannot tranfer self orders when alive")
 	}
@@ -257,7 +258,7 @@ func (this *Cluster) TransferOrders(serviceId string) {
 		// select one online service and transfer the pending orders
 		// TODO Random select
 		for _, peer := range this.raftServer.Peers() {
-			if !this.IsPeerOffline(peer) {
+			if !this.isPeerOffline(peer) {
 				if peer.Name == serviceId {
 					logrus.Debug("Abort tranfer orders when service recovery")
 					transferred = true
@@ -303,7 +304,7 @@ func (this *Cluster) DescribeState() (string, error) {
 
 	for _, peer := range this.raftServer.Peers() {
 		nodesMap = append(nodesMap, generatePeerInfo(peer.Name,
-			peer.ConnectionString, peer.LastActivity(), !this.IsPeerOffline(peer)))
+			peer.ConnectionString, peer.LastActivity(), !this.isPeerOffline(peer)))
 	}
 
 	nodesMap = append(nodesMap, generatePeerInfo(this.raftServer.Name(),

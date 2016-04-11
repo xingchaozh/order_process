@@ -26,7 +26,8 @@ type RedisCfg struct {
 
 // The definition of log configuration
 type LogCfg struct {
-	Loglevel string `json:"log_level"`
+	Level string `json:"level"`
+	Path  string `json:"path"`
 }
 
 // The definition of service configuration
@@ -53,7 +54,8 @@ func New() *Env {
 }
 
 // Initialize the environment
-func (env *Env) InitEnv() *Env {
+func (env *Env) InitEnv() (*Env, error) {
+	logrus.SetOutput(os.Stdout)
 
 	// Load redis configuration from file
 	type RedisCfgs struct {
@@ -101,19 +103,31 @@ func (env *Env) InitEnv() *Env {
 	}
 	err = util.MakeDir(env.ServiceConfig.Path)
 	if err != nil {
-		logrus.Fatal(err)
+		return nil, err
 	}
 
-	level, err := logrus.ParseLevel(env.LogConfig.Loglevel)
+	// Initialize logger
+	level, err := logrus.ParseLevel(env.LogConfig.Level)
 	if err != nil {
-		logrus.Error(err)
+		return nil, err
 	}
 	logrus.SetLevel(level)
 
-	logrus.Debugf("Redis configuration loaded: %v", env.RedisConfig)
-	logrus.Debugf("Log configuration loaded: %v", env.LogConfig)
-	logrus.Debugf("Service configuration loaded: %v", env.ServiceConfig)
+	if env.LogConfig.Path != "" {
+		path := util.JoinPath(env.ServiceConfig.Path, ServiceName+".log")
+		file, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND, 0)
+		if err != nil {
+			return nil, err
+		}
+		logrus.SetOutput(file)
+	} else {
+		logrus.SetOutput(os.Stdout)
+	}
+
+	logrus.Printf("Redis configuration loaded: %v", env.RedisConfig)
+	logrus.Printf("Log configuration loaded: %v", env.LogConfig)
+	logrus.Printf("Service configuration loaded: %v", env.ServiceConfig)
 
 	// If no local configuration found, we should qurey the Discovery Service.
-	return env
+	return env, nil
 }
